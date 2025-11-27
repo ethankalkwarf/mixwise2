@@ -1,0 +1,70 @@
+import { Cocktail, CocktailIngredient, Ingredient } from "./types";
+
+/**
+ * The CocktailRepository interface defines how the application retrieves
+ * cocktails. By coding against this interface rather than concrete
+ * implementations, the matching engine can remain agnostic of where
+ * cocktails come from (static arrays, Supabase, Sanity, etc.).
+ */
+export interface CocktailRepository {
+  getAllCocktails(): Promise<Cocktail[]>;
+  getCocktailById(id: number): Promise<Cocktail | null>;
+}
+
+/**
+ * Simple implementation that converts static or plain objects into the
+ * canonical Cocktail shape. Not wired in yet; useful for future CMS work.
+ */
+export class StaticCocktailRepository implements CocktailRepository {
+  private cocktails: Cocktail[];
+  private ingredients: Ingredient[];
+
+  constructor(cocktails: any[], ingredients: any[]) {
+    this.ingredients = ingredients;
+    this.cocktails = cocktails.map((c) => {
+      const ingredientsList: CocktailIngredient[] = c.ingredients
+        ? c.ingredients.map((ing: any) => ({
+            id: ing.id ?? ing.ingredientId ?? ing,
+            name:
+              ing.name ??
+              this.ingredients.find((it) => it.id === (ing.id ?? ing))?.name ??
+              "",
+            measure: ing.measure ?? null,
+            isOptional: ing.isOptional ?? false,
+          }))
+        : (c.ingredientIds || []).map((id: number) => {
+            const ingredient = this.ingredients.find((it) => it.id === id);
+            return {
+              id,
+              name: ingredient?.name ?? "",
+              measure: null,
+              isOptional: false,
+            };
+          });
+
+      return {
+        id: c.id,
+        name: c.name,
+        instructions: c.instructions ?? "",
+        category: c.category ?? "",
+        image_url: c.image_url ?? null,
+        glass: c.glass ?? null,
+        ingredients: ingredientsList,
+        tags: c.tags ?? [],
+        primarySpirit: c.primarySpirit,
+        difficulty: c.difficulty,
+        vibes: c.vibes,
+      } as Cocktail;
+    });
+
+    this.cocktails.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getAllCocktails(): Promise<Cocktail[]> {
+    return this.cocktails;
+  }
+
+  async getCocktailById(id: number): Promise<Cocktail | null> {
+    return this.cocktails.find((c) => c.id === id) ?? null;
+  }
+}
