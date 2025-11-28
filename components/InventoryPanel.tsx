@@ -11,7 +11,7 @@ type Props = {
 
 export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const selectedSet = useMemo(
     () => new Set<number>(selectedIds),
     [selectedIds],
@@ -29,7 +29,6 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
 
   const grouped = useMemo(() => {
     const byCategory = new Map<string, Ingredient[]>();
-    // Filter first
     const filtered = ingredients.filter(i => 
       i.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -40,8 +39,7 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
       list.push(ing);
       byCategory.set(key, list);
     }
-    
-    // Sort categories, but keep "Other" last if you prefer
+
     return Array.from(byCategory.entries()).sort((a, b) =>
       a[0].localeCompare(b[0]),
     );
@@ -56,7 +54,7 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                 {selectedIds.length} Selected
             </span>
         </div>
-        
+
         <div className="relative">
             <input 
                 type="text" 
@@ -65,7 +63,6 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/50"
             />
-             <svg className="w-4 h-4 absolute right-3 top-2.5 text-slate-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
         </div>
       </div>
 
@@ -94,7 +91,7 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                         checked ? 'bg-lime-500 border-lime-500' : 'border-slate-700 group-hover:border-slate-500'
                     }`}>
-                        {checked && <svg className="w-3 h-3 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                        {checked && "✓"}
                     </div>
                   </button>
                 );
