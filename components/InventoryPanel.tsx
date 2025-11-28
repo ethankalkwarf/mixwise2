@@ -11,18 +11,8 @@ type Props = {
   onChange: (ids: number[]) => void;
 };
 
-// Prioritized Category Order
 const CATEGORY_ORDER = [
-  "Spirit",
-  "Liqueur",
-  "Wine",
-  "Mixer",
-  "Beer",
-  "Bitters",
-  "Garnish",
-  "Syrup",
-  "Citrus",
-  "Other"
+  "Spirit", "Liqueur", "Wine", "Mixer", "Beer", "Bitters", "Garnish", "Syrup", "Citrus", "Other"
 ];
 
 const TOP_SPIRITS = [
@@ -63,18 +53,15 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
     }
 
     for (const ing of filtered) {
-        // Essentials logic
         if (TOP_SPIRITS.includes(ing.name) && !searchQuery && !activeFilter) {
             essentialItems.push(ing);
         }
-        
         const key = ing.category || "Other";
         const list = byCategory.get(key) ?? [];
         list.push(ing);
         byCategory.set(key, list);
     }
 
-    // Sort Categories by defined order
     const sortedCategories = Array.from(byCategory.entries()).sort((a, b) => {
         const indexA = CATEGORY_ORDER.indexOf(a[0]);
         const indexB = CATEGORY_ORDER.indexOf(b[0]);
@@ -84,7 +71,6 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
         return a[0].localeCompare(b[0]);
     });
 
-    // Sort filter chips
     const allCats = Array.from(new Set(ingredients.map(i => i.category || "Other"))).sort((a, b) => {
          const indexA = CATEGORY_ORDER.indexOf(a);
          const indexB = CATEGORY_ORDER.indexOf(b);
@@ -98,7 +84,6 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
   return (
     <section className="bg-slate-900/50 border border-white/5 rounded-2xl flex flex-col h-[calc(100vh-6rem)] overflow-hidden shadow-xl shadow-black/20">
       
-      {/* Header & Search */}
       <div className="p-4 space-y-3 border-b border-white/5 bg-slate-900/90 backdrop-blur z-20">
         <div className="flex items-center justify-between">
             <h2 className="text-xl font-serif font-bold text-slate-100 flex items-center gap-2">
@@ -122,7 +107,6 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
             <div className="absolute left-3 top-2.5 text-slate-600">🔍</div>
         </div>
 
-        {/* Filter Chips - Horizontal Scroll */}
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
             <button 
                 onClick={() => setActiveFilter(null)} 
@@ -142,10 +126,7 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
         </div>
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-6">
-        
-        {/* Essentials Grid */}
         {!searchQuery && !activeFilter && essentials.length > 0 && (
             <div className="space-y-2">
                 <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Essentials</h3>
@@ -163,11 +144,7 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                                 }`}
                             >
                                 <span className="text-2xl mb-1.5 filter drop-shadow-md transition-transform group-hover:scale-110">
-                                    {ing.name === "Gin" ? "🌸" : 
-                                     ing.name === "Vodka" ? "🍸" : 
-                                     ing.name === "Tequila" ? "🌵" :
-                                     (ing.name.includes("Whiskey") || ing.name.includes("Bourbon")) ? "🥃" :
-                                     (ing.name.includes("Rum")) ? "🏴‍☠️" : "🍾"}
+                                    {ing.name === "Gin" ? "🌸" : ing.name === "Vodka" ? "🍸" : ing.name === "Tequila" ? "🌵" : (ing.name.includes("Whiskey") || ing.name.includes("Bourbon")) ? "🥃" : (ing.name.includes("Rum")) ? "🏴‍☠️" : "🍾"}
                                 </span>
                                 <span className="text-[10px] font-semibold leading-tight">{ing.name}</span>
                                 {isSelected && (
@@ -180,10 +157,8 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
             </div>
         )}
 
-        {/* Categorized Accordions */}
         <div className="space-y-3">
             {categorized.map(([category, list]) => {
-                // Determine if open: if searching/filtering, always open. Otherwise, CLOSED (collapsed by default).
                 const isSearching = searchQuery.length > 0 || activeFilter !== null;
                 const hasSelection = list.some(i => selectedSet.has(i.id));
 
@@ -219,10 +194,8 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                                     <Disclosure.Panel className="px-3 pb-3 pt-1">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                             {list.map(ing => {
-                                                 // Don't show duplicate essentials in accordion unless filtering
                                                  if (!searchQuery && !activeFilter && TOP_SPIRITS.includes(ing.name)) return null;
                                                  const isSelected = selectedSet.has(ing.id);
-
                                                  return (
                                                     <button
                                                         key={ing.id}
