@@ -35,7 +35,7 @@ export default function RootLayout({
                   MixWise
                 </span>
               </div>
-              {/* Guest Mode Badge Removed */}
+              {/* Removed Guest Mode Component */}
             </header>
             <main className="flex-1">{children}</main>
           </div>
