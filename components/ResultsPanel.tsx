@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { getMatchGroups } from "@/lib/matching";
 import { Ingredient, Cocktail, SubstitutionRule } from "@/lib/types";
+// 👇 UPDATED IMPORT: Using the new CocktailDialog file
 import { CocktailDialog } from "./CocktailDialog";
 
 type Props = {
@@ -87,7 +88,8 @@ export function ResultsPanel({
 
   return (
     <section className="space-y-10 pb-20">
-      <RecipeDialog
+      {/* 👇 UPDATED COMPONENT: Using CocktailDialog */}
+      <CocktailDialog
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         cocktail={selectedCocktail}
