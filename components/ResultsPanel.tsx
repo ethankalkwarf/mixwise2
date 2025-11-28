@@ -146,7 +146,7 @@ export function ResultsPanel({
                     </span>
                 </button>
               </div>
-
+              
               <div className="p-4 flex-1 flex flex-col relative z-10 -mt-8">
                 <div className="bg-slate-900/90 backdrop-blur rounded-xl p-3 border border-white/5 shadow-lg flex-1">
                     <h3 className="font-serif font-bold text-lg text-slate-100 mb-1 leading-tight">
