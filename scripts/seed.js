@@ -28,12 +28,9 @@ const CATEGORY_MAP = {
   'Other / Unknown': 'Other'
 };
 
+// UPDATED: Spirits removed so they are treated as inventory items.
+// Only true basics (Ice, Water, Sugar, etc.) remain as staples.
 const STAPLES = [
-  'Vodka',
-  'Gin',
-  'Rum',
-  'Tequila',
-  'Bourbon',
   'Lemon Juice',
   'Lime Juice',
   'Simple Syrup',
