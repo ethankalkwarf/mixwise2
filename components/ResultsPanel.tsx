@@ -32,7 +32,7 @@ export function ResultsPanel({
       getMatchGroups({
         cocktails: allCocktails,
         ownedIngredientIds: inventoryIds,
-        stapleIngredientIds: [], 
+        stapleIngredientIds: [],
         substitutions: [],
       }),
     [allCocktails, inventoryIds]
@@ -189,47 +189,36 @@ export function ResultsPanel({
         </div>
       </div>
 
-      {/* 2. SMART ADDITIONS (Refined Design) */}
+      {/* 2. SMART ADDITIONS - Simplified */}
       {unlockPotential.length > 0 && (
       <div className="border-t border-slate-800/50 pt-10">
-        <div className="mb-6">
-            <h2 className="text-2xl font-serif font-bold text-white mb-1">Smart Additions</h2>
-            <p className="text-sm text-slate-400">Buy these bottles to unlock the most new recipes immediately.</p>
+        <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-2xl font-serif font-bold text-white">Smart Additions</h2>
+            <span className="text-sm text-slate-500">Unlocks new recipes</span>
         </div>
 
-        {/* Changed grid to 2 cols for more width, cards are now flex-row */}
-        <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
              {unlockPotential.map(item => (
-                 <div key={item.id} className="group relative flex flex-row items-center justify-between p-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-600 transition-all overflow-hidden">
+                 <div key={item.id} className="group flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-lime-500/30 transition-all">
                     
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0">
                         {/* UNLOCKS BADGE */}
-                        <div className="relative flex-shrink-0 w-16 h-16 bg-slate-800 rounded-xl flex flex-col items-center justify-center border border-white/5">
-                             <span className="text-xl font-bold text-lime-400 leading-none">+{item.count}</span>
-                             <span className="text-[9px] font-bold text-slate-500 uppercase mt-1">Unlocks</span>
+                        <div className="flex-shrink-0 w-12 h-12 bg-slate-800 rounded-lg flex flex-col items-center justify-center border border-white/5 group-hover:bg-slate-800/80 transition-colors">
+                             <span className="text-lg font-bold text-lime-400 leading-none">+{item.count}</span>
                         </div>
                         
-                        {/* TEXT INFO */}
-                        <div className="flex flex-col min-w-0 pr-2">
-                            <h4 className="font-bold text-slate-100 text-base leading-snug whitespace-normal break-words">
-                                {item.name}
-                            </h4>
-                            <p className="text-[11px] text-slate-400 mt-1 truncate">
-                                <span className="text-lime-500/80">Makes:</span> {item.drinks.slice(0, 2).join(", ")}{item.drinks.length > 2 && "..."}
-                            </p>
-                            <p className="text-[10px] text-slate-600 mt-0.5">
-                                Used in {item.totalUsage} total recipes
-                            </p>
-                        </div>
+                        {/* NAME */}
+                        <h4 className="font-bold text-slate-200 text-sm truncate pr-2">
+                            {item.name}
+                        </h4>
                     </div>
                     
-                    {/* ACTION BUTTON - Explicit Text */}
+                    {/* ADD BUTTON */}
                     <button
                         onClick={() => onAddToInventory(item.id)}
-                        className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-lime-500/10 text-lime-400 border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all font-bold text-xs uppercase tracking-wide group-hover:shadow-lg group-hover:shadow-lime-500/20"
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-lime-500/10 text-lime-400 border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all font-bold text-xs"
                     >
-                        <PlusIcon className="w-4 h-4" /> 
-                        Add to Bar
+                        <PlusIcon className="w-3 h-3" /> Add
                     </button>
                  </div>
              ))}
