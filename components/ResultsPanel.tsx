@@ -38,7 +38,6 @@ export function ResultsPanel({
   }, [allIngredients]);
 
   // --- MATCHING ENGINE ---
-  // We now destructure 'all' as well to search the entire database
   const { makeNow, almostThere, all } = useMemo(
     () =>
       getMatchGroups({
@@ -52,7 +51,6 @@ export function ResultsPanel({
 
   // --- EXTRACT CATEGORIES ---
   const availableCategories = useMemo(() => {
-    // If searching, show categories from ALL matches, otherwise just from Ready to Mix
     const source = searchQuery ? all : makeNow;
     const cats = new Set(source.map(m => m.cocktail.category));
     return Array.from(cats).sort();
@@ -63,10 +61,16 @@ export function ResultsPanel({
     // 1. Determine Source: Search ? All : Ready
     let results = searchQuery ? [...all] : [...makeNow];
 
-    // 2. Filter by Search
+    // 2. Filter by Search (Updated to support "Featured")
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      results = results.filter(r => r.cocktail.name.toLowerCase().includes(q));
+      // Special Keywords: Show Popular/Featured drinks
+      if (['featured', 'popular', 'favorite', 'favorites'].includes(q)) {
+        results = results.filter(r => r.cocktail.is_popular);
+      } else {
+        // Standard Name Search
+        results = results.filter(r => r.cocktail.name.toLowerCase().includes(q));
+      }
     }
 
     // 3. Filter by Category
