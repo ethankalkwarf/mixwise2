@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getMatchGroups } from "@/lib/matching";
-import { Ingredient, Cocktail, SubstitutionRule } from "@/lib/types";
-// 👇 THIS IS THE KEY FIX: Importing CocktailDialog instead of RecipeDialog
+import { Ingredient, Cocktail } from "@/lib/types";
 import { CocktailDialog } from "./CocktailDialog";
 import { PlusIcon } from "@heroicons/react/20/solid";
 
@@ -15,10 +14,6 @@ type Props = {
   onToggleFavorite: (cocktailId: number) => void;
   onAddToInventory: (id: number) => void;
 };
-
-function normalizeName(name: string): string {
-  return name.toLowerCase().trim();
-}
 
 export function ResultsPanel({
   inventoryIds,
@@ -37,15 +32,13 @@ export function ResultsPanel({
       getMatchGroups({
         cocktails: allCocktails,
         ownedIngredientIds: inventoryIds,
-        stapleIngredientIds: [], // Staples are handled via DB flag now
+        stapleIngredientIds: [], 
         substitutions: [],
       }),
     [allCocktails, inventoryIds]
   );
 
   // --- SORTING & UNLOCK LOGIC ---
-
-  // 1. Sort "Ready to Mix" by Popularity first
   const sortedMakeNow = useMemo(() => {
     return [...makeNow].sort((a, b) => {
       // Popular drinks first
@@ -56,24 +49,17 @@ export function ResultsPanel({
     });
   }, [makeNow]);
 
-  // 2. Calculate Smart "Unlock" Suggestions
   const unlockPotential = useMemo(() => {
-    // A. Count immediate unlocks (from "Almost There" list)
     const immediateUnlockCounts = new Map<number, { count: number; drinks: string[] }>();
-
     almostThere.forEach(match => {
         const missingId = match.missingRequiredIngredientIds[0];
         if (!missingId) return;
-
         const current = immediateUnlockCounts.get(missingId) || { count: 0, drinks: [] };
         current.count += 1;
-        if (current.drinks.length < 3) {
-            current.drinks.push(match.cocktail.name);
-        }
+        if (current.drinks.length < 3) current.drinks.push(match.cocktail.name);
         immediateUnlockCounts.set(missingId, current);
     });
 
-    // B. Count total usage in ALL cocktails (Long-term value)
     const totalUsageCounts = new Map<number, number>();
     allCocktails.forEach(c => {
         c.ingredients.forEach(ing => {
@@ -81,29 +67,23 @@ export function ResultsPanel({
         });
     });
 
-    // C. Combine & Sort
     return Array.from(immediateUnlockCounts.entries())
         .map(([id, data]) => {
             const ing = allIngredients.find(i => i.id === id);
             return {
                 id,
                 name: ing?.name || "Unknown",
-                count: data.count, // Immediate unlocks
-                totalUsage: totalUsageCounts.get(id) || 0, // Long-term value
+                count: data.count,
+                totalUsage: totalUsageCounts.get(id) || 0,
                 drinks: data.drinks
             };
         })
         .sort((a, b) => {
-            // Primary Sort: How many NEW drinks does it unlock right now?
             if (b.count !== a.count) return b.count - a.count;
-            
-            // Secondary Sort: How many TOTAL drinks use this ingredient?
-            // (Tie-breaker: Buy the more versatile bottle)
             return b.totalUsage - a.totalUsage;
         });
 
   }, [almostThere, allCocktails, allIngredients]);
-
 
   function openRecipe(cocktail: Cocktail) {
     setSelectedCocktail(cocktail);
@@ -170,10 +150,10 @@ export function ResultsPanel({
                     <div className="h-full w-full flex items-center justify-center text-slate-700 text-4xl">🥃</div>
                 )}
                 
-                {/* Popular Badge */}
+                {/* Popular Badge - Text changed to FAVORITE */}
                 {cocktail.is_popular && (
                     <div className="absolute top-3 left-3 bg-amber-500/90 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded shadow-lg backdrop-blur-sm flex items-center gap-1 z-20">
-                        ★ POPULAR
+                        ★ FAVORITE
                     </div>
                 )}
 
@@ -220,13 +200,14 @@ export function ResultsPanel({
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
              {unlockPotential.map(item => (
-                 <div key={item.id} className="group flex items-center justify-between p-1 pr-2 rounded-xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 transition-all">
-                    <div className="flex items-center gap-4">
-                        <div className="bg-slate-800 h-16 w-16 rounded-l-xl flex flex-col items-center justify-center border-r border-white/5 group-hover:bg-slate-800/80 transition-colors">
+                 // Updated padding here (p-2 pr-3) to prevent button overflow
+                 <div key={item.id} className="group flex items-center justify-between p-2 pr-3 rounded-xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 transition-all">
+                    <div className="flex items-center gap-4 min-w-0">
+                        <div className="bg-slate-800 h-16 w-16 rounded-xl flex flex-col items-center justify-center border border-white/5 group-hover:bg-slate-800/80 transition-colors flex-shrink-0">
                              <span className="text-lg font-bold text-lime-400">+{item.count}</span>
                              <span className="text-[9px] text-slate-500 uppercase tracking-wide">New</span>
                         </div>
-                        <div className="py-2 min-w-0 flex-1">
+                        <div className="py-1 min-w-0 flex-1">
                             <h4 className="font-bold text-slate-200 group-hover:text-white transition-colors truncate">{item.name}</h4>
                             <div className="flex flex-col gap-0.5">
                                 <p className="text-[10px] text-slate-500 truncate">
@@ -241,7 +222,7 @@ export function ResultsPanel({
                     
                     <button
                         onClick={() => onAddToInventory(item.id)}
-                        className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-lime-500/10 text-lime-400 text-xs font-bold border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all"
+                        className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 ml-2 rounded-lg bg-lime-500/10 text-lime-400 text-xs font-bold border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all"
                     >
                         <PlusIcon className="w-3 h-3" /> Add
                     </button>
