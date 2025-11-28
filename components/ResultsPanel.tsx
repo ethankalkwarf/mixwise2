@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { getMatchGroups } from "@/lib/matching";
 import { Ingredient, Cocktail, SubstitutionRule } from "@/lib/types";
-import { RecipeDialog } from "./RecipeDialog";
+import { CocktailDialog } from "./CocktailDialog";
 
 type Props = {
   inventoryIds: number[];
