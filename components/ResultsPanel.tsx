@@ -9,68 +9,75 @@ type Props = {
   inventoryIds: number[];
   allCocktails: Cocktail[];
   allIngredients: Ingredient[];
-  shoppingList: number[];
-  onToggleShoppingList: (id: number) => void;
+  // Removed old shopping list props as we are switching to "Unlock" logic
+  // shoppingList: number[];
+  // onToggleShoppingList: (id: number) => void;
   favoriteIds: number[];
   onToggleFavorite: (cocktailId: number) => void;
+  // Added ability to add to inventory from here
+  onAddToInventory: (id: number) => void;
 };
-
-function normalizeName(name: string): string {
-  return name.toLowerCase().trim();
-}
 
 export function ResultsPanel({
   inventoryIds,
   allCocktails,
   allIngredients,
-  shoppingList,
-  onToggleShoppingList,
   favoriteIds,
   onToggleFavorite,
+  onAddToInventory,
 }: Props) {
   const [selectedCocktail, setSelectedCocktail] = useState<Cocktail | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const stapleIds = useMemo(
-    () => allIngredients.filter((i) => i.is_staple).map((i) => i.id),
-    [allIngredients],
-  );
-
-  const substitutions: SubstitutionRule[] = useMemo(() => {
-    const byName = new Map<string, Ingredient[]>();
-    for (const ing of allIngredients) {
-      const key = normalizeName(ing.name);
-      const list = byName.get(key) ?? [];
-      list.push(ing);
-      byName.set(key, list);
-    }
-    const rules: SubstitutionRule[] = [];
-    byName.forEach((list) => {
-      if (list.length < 2) return;
-      for (let i = 0; i < list.length; i++) {
-        for (let j = 0; j < list.length; j++) {
-          if (i === j) continue;
-          rules.push({
-            fromIngredientId: list[i].id,
-            toIngredientId: list[j].id,
-            strength: 1,
-          });
-        }
-      }
-    });
-    return rules;
-  }, [allIngredients]);
-
-  const { makeNow, almostThere: almostThereGroups } = useMemo(
+  // Assuming staples logic is handled DB-side now (is_staple = true)
+  // But we pass empty here for matching to rely on the DB flag logic if implemented in matching.ts
+  // Or if matching.ts still expects stapleIds, we can fetch them.
+  // For this "Unlock" view, we focus on non-staples.
+  
+  const { makeNow, almostThere } = useMemo(
     () =>
       getMatchGroups({
         cocktails: allCocktails,
         ownedIngredientIds: inventoryIds,
-        stapleIngredientIds: stapleIds,
-        substitutions,
+        stapleIngredientIds: [], // Staples should be marked in DB now
+        substitutions: [], // Simplification for now
       }),
-    [allCocktails, inventoryIds, stapleIds, substitutions],
+    [allCocktails, inventoryIds]
   );
+
+  // --- "UNLOCK" LOGIC ---
+  // Calculate which missing ingredients unlock the most drinks
+  const unlockPotential = useMemo(() => {
+    const counts = new Map<number, { count: number; drinks: string[] }>();
+
+    almostThere.forEach(match => {
+        const missingId = match.missingRequiredIngredientIds[0];
+        if (!missingId) return;
+
+        const current = counts.get(missingId) || { count: 0, drinks: [] };
+        current.count += 1;
+        if (current.drinks.length < 3) {
+            current.drinks.push(match.cocktail.name);
+        }
+        counts.set(missingId, current);
+    });
+
+    // Convert to array and sort by impact
+    return Array.from(counts.entries())
+        .map(([id, data]) => {
+            const ing = allIngredients.find(i => i.id === id);
+            return {
+                id,
+                name: ing?.name || "Unknown",
+                category: ing?.category || "Other",
+                count: data.count,
+                drinks: data.drinks
+            };
+        })
+        .sort((a, b) => b.count - a.count); // Highest impact first
+
+  }, [almostThere, allIngredients]);
+
 
   function openRecipe(cocktail: Cocktail) {
     setSelectedCocktail(cocktail);
@@ -86,8 +93,7 @@ export function ResultsPanel({
   }, [selectedCocktail, inventoryIds]);
 
   return (
-    <section className="space-y-10 pb-20">
-      {/* 👇 UPDATED COMPONENT: Using CocktailDialog */}
+    <section className="space-y-8 pb-24">
       <CocktailDialog
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -98,19 +104,21 @@ export function ResultsPanel({
 
       {/* 1. Ready to Mix */}
       <div>
-        <div className="flex items-center gap-3 mb-6">
-            <h2 className="text-2xl font-serif font-bold text-white">Ready to Mix</h2>
-            <div className="bg-lime-500/10 border border-lime-500/20 text-lime-400 px-3 py-0.5 rounded-full text-sm font-medium">
-                {makeNow.length} Available
+        <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-serif font-bold text-white">Ready to Mix</h2>
+                <div className="bg-lime-500/10 border border-lime-500/20 text-lime-400 px-3 py-0.5 rounded-full text-sm font-bold font-mono">
+                    {makeNow.length}
+                </div>
             </div>
         </div>
 
         {makeNow.length === 0 && (
-          <div className="flex flex-col items-center justify-center p-10 border border-dashed border-slate-800 rounded-2xl bg-slate-900/30 text-center">
-            <div className="text-4xl mb-3">🍸</div>
-            <h3 className="text-slate-300 font-medium mb-1">Your bar is looking a bit dry</h3>
-            <p className="text-slate-500 text-sm max-w-sm">
-                Add ingredients from the panel on the left to discover recipes you can mix right now.
+          <div className="flex flex-col items-center justify-center p-12 border border-dashed border-slate-800 rounded-2xl bg-slate-900/30 text-center">
+            <div className="text-5xl mb-4 opacity-80">🍸</div>
+            <h3 className="text-slate-200 font-semibold mb-2 text-lg">Your bar is looking a bit dry</h3>
+            <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
+                Add ingredients from the panel on the left to discover what you can make.
             </p>
           </div>
         )}
@@ -122,13 +130,14 @@ export function ResultsPanel({
               onClick={() => openRecipe(cocktail)}
               className="cursor-pointer group relative flex flex-col overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 hover:border-lime-500/40 hover:shadow-xl hover:shadow-lime-900/10 transition-all duration-300"
             >
+              {/* Image Area */}
               <div className="relative h-48 w-full overflow-hidden bg-slate-800">
                 {cocktail.image_url ? (
                   <>
                   <img
                     src={cocktail.image_url}
                     alt=""
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-90 group-hover:opacity-100"
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80" />
                   </>
@@ -140,23 +149,26 @@ export function ResultsPanel({
                       e.stopPropagation();
                       onToggleFavorite(cocktail.id);
                     }}
-                    className="absolute top-3 right-3 p-2 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 transition-colors"
+                    className="absolute top-3 right-3 p-2 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 transition-colors text-white/80 hover:text-red-500"
                 >
-                    <span className={`text-lg ${favoriteIds.includes(cocktail.id) ? "text-red-500" : "text-white/70"}`}>
-                        {favoriteIds.includes(cocktail.id) ? "♥" : "♡"}
-                    </span>
+                    {favoriteIds.includes(cocktail.id) ? "♥" : "♡"}
                 </button>
               </div>
               
-              <div className="p-4 flex-1 flex flex-col relative z-10 -mt-8">
-                <div className="bg-slate-900/90 backdrop-blur rounded-xl p-3 border border-white/5 shadow-lg flex-1">
-                    <h3 className="font-serif font-bold text-lg text-slate-100 mb-1 leading-tight">
-                        {cocktail.name}
-                    </h3>
-                    <p className="text-xs text-lime-400 font-medium tracking-wide uppercase mb-2">
-                        {cocktail.category}
-                    </p>
-                    <p className="text-xs text-slate-400 line-clamp-2">
+              {/* Content Area */}
+              <div className="p-4 flex-1 flex flex-col relative z-10 -mt-12">
+                <div className="bg-slate-900/95 backdrop-blur-md rounded-xl p-4 border border-white/5 shadow-lg flex-1 flex flex-col">
+                    <div className="flex justify-between items-start mb-2">
+                        <div>
+                            <p className="text-[10px] text-lime-400 font-bold tracking-wide uppercase mb-1">
+                                {cocktail.category}
+                            </p>
+                            <h3 className="font-serif font-bold text-lg text-slate-100 leading-tight">
+                                {cocktail.name}
+                            </h3>
+                        </div>
+                    </div>
+                    <p className="text-xs text-slate-400 line-clamp-2 mt-auto">
                         {cocktail.ingredients.map((i) => i.name).join(", ")}
                     </p>
                 </div>
@@ -166,72 +178,37 @@ export function ResultsPanel({
         </div>
       </div>
 
-      {/* 2. One Ingredient Away */}
-      {almostThereGroups.length > 0 && (
-      <div>
-        <div className="flex items-center gap-3 mb-6 mt-12 pt-8 border-t border-slate-800/50">
-            <h2 className="text-2xl font-serif font-bold text-white">One Bottle Away</h2>
-            <div className="bg-slate-800 text-slate-400 px-3 py-0.5 rounded-full text-sm font-medium">
-                {almostThereGroups.length} Recipes
-            </div>
+      {/* 2. Unlock Opportunities (Replaces Shop) */}
+      {unlockPotential.length > 0 && (
+      <div className="mt-12 pt-8 border-t border-slate-800/50">
+        <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-2xl font-serif font-bold text-white">Smart Additions</h2>
+            <span className="text-sm text-slate-500">Items that unlock the most new drinks</span>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {almostThereGroups.map(({ cocktail, missingRequiredIngredientIds }) => {
-            const missingId = missingRequiredIngredientIds[0];
-            const missingName = allIngredients.find(
-              (i) => i.id === missingId,
-            )?.name;
-            const inShoppingList = shoppingList.includes(missingId);
-
-            return (
-              <div
-                key={cocktail.id}
-                onClick={() => openRecipe(cocktail)}
-                className="cursor-pointer group flex flex-col rounded-2xl bg-slate-900/40 border border-slate-800 hover:bg-slate-900 hover:border-slate-600 transition-all duration-300"
-              >
-                 <div className="p-4 flex items-start justify-between gap-4">
-                    <div>
-                        <h3 className="font-bold text-slate-200 group-hover:text-white transition-colors">
-                            {cocktail.name}
-                        </h3>
-                         <p className="text-xs text-slate-500 mt-1 line-clamp-1">
-                            With: {cocktail.ingredients.map((i) => i.name).join(", ")}
-                        </p>
-                    </div>
-                    {cocktail.image_url && (
-                        <img 
-                            src={cocktail.image_url} 
-                            className="w-12 h-12 rounded-lg object-cover bg-slate-800"
-                            alt="" 
-                        />
-                    )}
-                 </div>
-
-                 <div className="mt-auto px-4 pb-4">
-                    <div className="flex items-center justify-between bg-slate-950/50 rounded-lg p-2 border border-slate-800/50">
-                        <div className="text-xs">
-                            <span className="text-slate-500">Missing: </span>
-                            <span className="text-red-400 font-medium">{missingName}</span>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+             {unlockPotential.map(item => (
+                 <div key={item.id} className="group flex items-center justify-between p-1 pr-2 rounded-xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 transition-all">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-slate-800 h-16 w-16 rounded-l-xl flex items-center justify-center text-2xl border-r border-white/5 group-hover:bg-slate-800/80 transition-colors">
+                             <span className="text-lg font-bold text-lime-400">+{item.count}</span>
                         </div>
-                        <button
-                            onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleShoppingList(missingId);
-                            }}
-                            className={`text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors ${
-                            inShoppingList
-                                ? "bg-amber-500/20 text-amber-500 border border-amber-500/20"
-                                : "bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700"
-                            }`}
-                        >
-                            {inShoppingList ? "On List" : "+ Shop"}
-                        </button>
+                        <div className="py-2">
+                            <h4 className="font-bold text-slate-200 group-hover:text-white transition-colors">{item.name}</h4>
+                            <p className="text-[10px] text-slate-500">
+                                Unlocks: {item.drinks.slice(0, 2).join(", ")} {item.drinks.length > 2 && "& more"}
+                            </p>
+                        </div>
                     </div>
+                    
+                    <button
+                        onClick={() => onAddToInventory(item.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-lime-500/10 text-lime-400 text-xs font-bold border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all"
+                    >
+                        Add
+                    </button>
                  </div>
-              </div>
-            );
-          })}
+             ))}
         </div>
       </div>
       )}
