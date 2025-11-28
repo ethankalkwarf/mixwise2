@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { getMatchGroups } from "@/lib/matching";
 import { Ingredient, Cocktail, SubstitutionRule } from "@/lib/types";
-// 👇 UPDATED IMPORT: Using the new CocktailDialog file
 import { CocktailDialog } from "./CocktailDialog";
 
 type Props = {
