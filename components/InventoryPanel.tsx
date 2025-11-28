@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Ingredient } from "@/lib/types";
 import { Disclosure, Transition } from "@headlessui/react";
+import { ChevronUpIcon } from "@heroicons/react/20/solid";
 
 type Props = {
   ingredients: Ingredient[];
@@ -10,109 +11,102 @@ type Props = {
   onChange: (ids: number[]) => void;
 };
 
-// Common ingredients to feature at the top for quick access
-const TOP_SPIRITS = [
-  "Vodka",
-  "Gin",
-  "Tequila",
-  "White Rum",
-  "Bourbon",
-  "Whiskey",
-  "Rum",
-  "Mezcal",
-  "Scotch"
+// Prioritized Category Order
+const CATEGORY_ORDER = [
+  "Spirit",
+  "Liqueur",
+  "Wine",
+  "Mixer",
+  "Beer",
+  "Bitters",
+  "Garnish",
+  "Syrup",
+  "Citrus",
+  "Other"
 ];
 
-// Helper icon mapping for categories
+const TOP_SPIRITS = [
+  "Vodka", "Gin", "Tequila", "White Rum", "Bourbon", "Whiskey", "Rum", "Mezcal", "Scotch"
+];
+
 const CATEGORY_ICONS: Record<string, string> = {
-  "Spirit": "🥃",
-  "Liqueur": "🏺",
-  "Mixer": "🥤",
-  "Garnish": "🍒",
-  "Wine": "🍷",
-  "Beer": "🍺",
-  "Bitters": "💧",
-  "Other": "📦"
+  "Spirit": "🥃", "Liqueur": "🏺", "Mixer": "🥤", "Garnish": "🍒",
+  "Wine": "🍷", "Beer": "🍺", "Bitters": "💧", "Other": "📦",
+  "Syrup": "🍯", "Citrus": "🍋"
 };
 
 export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
-  const selectedSet = useMemo(
-    () => new Set<number>(selectedIds),
-    [selectedIds],
-  );
+  const selectedSet = useMemo(() => new Set<number>(selectedIds), [selectedIds]);
 
   const handleToggle = (id: number) => {
     const next = new Set(selectedSet);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     onChange(Array.from(next));
   };
 
-  // Separate "Essentials" from the rest
-  const { essentials, categorized } = useMemo(() => {
+  const { essentials, categorized, allCategories } = useMemo(() => {
     const essentialItems: Ingredient[] = [];
     const byCategory = new Map<string, Ingredient[]>();
-
-    // 1. Filter by Search
     let filtered = ingredients;
+
     if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         filtered = ingredients.filter(i => i.name.toLowerCase().includes(q));
     }
 
-    // 2. Filter by Chip/Pill
     if (activeFilter) {
         filtered = filtered.filter(i => i.category === activeFilter);
     }
 
     for (const ing of filtered) {
-        // Check if it's a "Top Spirit" (exact match or close enough for now)
+        // Essentials logic
         if (TOP_SPIRITS.includes(ing.name) && !searchQuery && !activeFilter) {
             essentialItems.push(ing);
         }
-
+        
         const key = ing.category || "Other";
         const list = byCategory.get(key) ?? [];
         list.push(ing);
         byCategory.set(key, list);
     }
 
-    // Sort essentials by our predefined list order
-    essentialItems.sort((a, b) => TOP_SPIRITS.indexOf(a.name) - TOP_SPIRITS.indexOf(b.name));
+    // Sort Categories by defined order
+    const sortedCategories = Array.from(byCategory.entries()).sort((a, b) => {
+        const indexA = CATEGORY_ORDER.indexOf(a[0]);
+        const indexB = CATEGORY_ORDER.indexOf(b[0]);
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return a[0].localeCompare(b[0]);
+    });
 
-    return { 
-        essentials: essentialItems,
-        categorized: Array.from(byCategory.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-    };
+    // Sort filter chips
+    const allCats = Array.from(new Set(ingredients.map(i => i.category || "Other"))).sort((a, b) => {
+         const indexA = CATEGORY_ORDER.indexOf(a);
+         const indexB = CATEGORY_ORDER.indexOf(b);
+         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+         return a.localeCompare(b);
+    });
+
+    return { essentials: essentialItems, categorized: sortedCategories, allCategories: allCats };
   }, [ingredients, searchQuery, activeFilter]);
 
-  // Available categories for filter chips
-  const allCategories = useMemo(() => {
-      const cats = new Set(ingredients.map(i => i.category || "Other"));
-      return Array.from(cats).sort();
-  }, [ingredients]);
-
   return (
-    <section className="bg-slate-900/50 border border-white/5 rounded-2xl flex flex-col h-[calc(100vh-6rem)] overflow-hidden">
+    <section className="bg-slate-900/50 border border-white/5 rounded-2xl flex flex-col h-[calc(100vh-6rem)] overflow-hidden shadow-xl shadow-black/20">
       
-      {/* --- HEADER & SEARCH --- */}
-      <div className="p-4 space-y-4 border-b border-white/5 bg-slate-900/80 backdrop-blur z-20">
+      {/* Header & Search */}
+      <div className="p-4 space-y-3 border-b border-white/5 bg-slate-900/90 backdrop-blur z-20">
         <div className="flex items-center justify-between">
             <h2 className="text-xl font-serif font-bold text-slate-100 flex items-center gap-2">
-                My Bar <span className="text-xs font-sans font-normal text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{selectedIds.length}</span>
+                My Bar <span className="text-xs font-sans font-bold text-slate-900 bg-lime-400 px-2 py-0.5 rounded-full">{selectedIds.length}</span>
             </h2>
             {selectedIds.length > 0 && (
-                <button 
-                    onClick={() => onChange([])}
-                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                >
-                    Clear All
+                <button onClick={() => onChange([])} className="text-xs font-medium text-slate-500 hover:text-red-400 transition-colors">
+                    Reset
                 </button>
             )}
         </div>
@@ -120,37 +114,27 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
         <div className="relative group">
             <input 
                 type="text" 
-                placeholder="Search ingredients..." 
+                placeholder="Find ingredients..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-lime-500/50 focus:border-transparent transition-all"
+                className="w-full bg-black/40 border border-slate-700 rounded-xl px-10 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-lime-500/50 focus:border-lime-500/50 transition-all"
             />
-            <div className="absolute right-3 top-2.5 text-slate-600 group-focus-within:text-lime-500 transition-colors">
-                🔍
-            </div>
+            <div className="absolute left-3 top-2.5 text-slate-600">🔍</div>
         </div>
 
-        {/* Filter Chips */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-            <button
-                onClick={() => setActiveFilter(null)}
-                className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                    activeFilter === null 
-                    ? "bg-lime-500/10 border-lime-500/50 text-lime-400" 
-                    : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500"
-                }`}
+        {/* Filter Chips - Horizontal Scroll */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+            <button 
+                onClick={() => setActiveFilter(null)} 
+                className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-all ${activeFilter === null ? "bg-lime-500 text-slate-900 border-lime-500" : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700"}`}
             >
                 All
             </button>
             {allCategories.map(cat => (
-                <button
-                    key={cat}
-                    onClick={() => setActiveFilter(cat === activeFilter ? null : cat)}
-                    className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                        activeFilter === cat 
-                        ? "bg-lime-500/10 border-lime-500/50 text-lime-400" 
-                        : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500"
-                    }`}
+                <button 
+                    key={cat} 
+                    onClick={() => setActiveFilter(cat === activeFilter ? null : cat)} 
+                    className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-all ${activeFilter === cat ? "bg-lime-500 text-slate-900 border-lime-500" : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700"}`}
                 >
                     {CATEGORY_ICONS[cat]} {cat}
                 </button>
@@ -158,15 +142,13 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
         </div>
       </div>
 
-      {/* --- SCROLLABLE CONTENT --- */}
+      {/* Content Area */}
       <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-6">
         
-        {/* Essentials Grid (Only show if no search/filter active) */}
+        {/* Essentials Grid */}
         {!searchQuery && !activeFilter && essentials.length > 0 && (
-            <div>
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-1">
-                    Essentials
-                </h3>
+            <div className="space-y-2">
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Essentials</h3>
                 <div className="grid grid-cols-3 gap-2">
                     {essentials.map(ing => {
                         const isSelected = selectedSet.has(ing.id);
@@ -174,22 +156,22 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                             <button
                                 key={ing.id}
                                 onClick={() => handleToggle(ing.id)}
-                                className={`relative flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
+                                className={`relative flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all duration-200 ${
                                     isSelected
-                                    ? "bg-lime-500/20 border-lime-500/50 text-lime-100 shadow-[0_0_15px_-3px_rgba(132,204,22,0.3)]"
-                                    : "bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800 hover:border-slate-600"
+                                    ? "bg-lime-500/10 border-lime-500/50 text-lime-100 shadow-[0_0_10px_-2px_rgba(132,204,22,0.2)]"
+                                    : "bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-800 hover:border-slate-600"
                                 }`}
                             >
-                                <span className="text-2xl mb-1 filter drop-shadow-lg">
-                                    {ing.name === "Vodka" ? "🍸" : 
-                                     ing.name === "Gin" ? "🌲" :
+                                <span className="text-2xl mb-1.5 filter drop-shadow-md transition-transform group-hover:scale-110">
+                                    {ing.name === "Gin" ? "🌸" : // Requested update
+                                     ing.name === "Vodka" ? "🍸" : 
                                      ing.name === "Tequila" ? "🌵" :
-                                     ing.name === "Whiskey" || ing.name === "Bourbon" ? "🥃" :
-                                     ing.name === "Rum" || ing.name === "White Rum" ? "🏴‍☠️" : "🍾"}
+                                     (ing.name.includes("Whiskey") || ing.name.includes("Bourbon")) ? "🥃" :
+                                     (ing.name.includes("Rum")) ? "🏴‍☠️" : "🍾"}
                                 </span>
-                                <span className="text-[10px] font-medium leading-tight">{ing.name}</span>
+                                <span className="text-[10px] font-semibold leading-tight">{ing.name}</span>
                                 {isSelected && (
-                                    <div className="absolute top-1 right-1 w-2 h-2 bg-lime-500 rounded-full shadow-sm" />
+                                    <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-lime-500 rounded-full shadow-[0_0_5px_rgba(132,204,22,0.8)]" />
                                 )}
                             </button>
                         )
@@ -198,35 +180,36 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
             </div>
         )}
 
-        {/* Categorized Lists (Accordions) */}
+        {/* Categorized Accordions */}
         <div className="space-y-3">
             {categorized.map(([category, list]) => {
-                // Skip if empty
-                if(list.length === 0) return null;
-                
-                // Count selected in this category
-                const selectedCount = list.filter(i => selectedSet.has(i.id)).length;
-                const isExpandedDefault = searchQuery.length > 0 || activeFilter !== null;
+                // Determine if open: if searching/filtering, always open. Otherwise, check if items selected.
+                const isSearching = searchQuery.length > 0 || activeFilter !== null;
+                const hasSelection = list.some(i => selectedSet.has(i.id));
+                // Default open Spirits and Liqueurs for easy access if no search
+                const isPriority = !isSearching && ["Spirit", "Liqueur", "Mixer"].includes(category);
 
                 return (
-                    <Disclosure key={category} defaultOpen={isExpandedDefault || selectedCount > 0}>
+                    <Disclosure key={category} defaultOpen={isSearching || hasSelection || isPriority}>
                         {({ open }) => (
-                            <div className={`rounded-xl border transition-all ${open ? 'bg-slate-900 border-slate-700' : 'bg-transparent border-transparent'}`}>
-                                <Disclosure.Button className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-800/50 transition-colors group">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg">{CATEGORY_ICONS[category] || "📦"}</span>
-                                        <span className={`text-sm font-medium ${selectedCount > 0 ? 'text-lime-400' : 'text-slate-300'}`}>
+                            <div className={`rounded-xl border transition-all duration-300 ${open ? 'bg-slate-900/50 border-slate-700' : 'bg-transparent border-transparent'}`}>
+                                <Disclosure.Button className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-slate-800/50 transition-colors group">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="text-lg opacity-80">{CATEGORY_ICONS[category] || "📦"}</span>
+                                        <span className={`text-sm font-medium ${hasSelection ? 'text-lime-400' : 'text-slate-300 group-hover:text-white'}`}>
                                             {category}
                                         </span>
-                                        {selectedCount > 0 && (
-                                            <span className="bg-lime-500/20 text-lime-400 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                                                {selectedCount}
+                                        {hasSelection && (
+                                            <span className="bg-lime-500/10 text-lime-400 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                                {list.filter(i => selectedSet.has(i.id)).length}
                                             </span>
                                         )}
                                     </div>
-                                    <span className={`text-slate-600 transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+                                    <ChevronUpIcon
+                                        className={`${open ? 'rotate-180 transform' : ''} h-4 w-4 text-slate-500 transition-transform duration-200`}
+                                    />
                                 </Disclosure.Button>
-
+                                
                                 <Transition
                                     enter="transition duration-100 ease-out"
                                     enterFrom="transform scale-95 opacity-0"
@@ -238,21 +221,21 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                                     <Disclosure.Panel className="px-3 pb-3 pt-1">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                             {list.map(ing => {
-                                                const isSelected = selectedSet.has(ing.id);
-                                                // Don't duplicate items shown in Essentials grid unless searching
-                                                if (!searchQuery && !activeFilter && TOP_SPIRITS.includes(ing.name)) return null;
+                                                 // Don't show duplicate essentials in accordion unless filtering
+                                                 if (!searchQuery && !activeFilter && TOP_SPIRITS.includes(ing.name)) return null;
+                                                 const isSelected = selectedSet.has(ing.id);
 
-                                                return (
+                                                 return (
                                                     <button
                                                         key={ing.id}
                                                         onClick={() => handleToggle(ing.id)}
-                                                        className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all text-left border ${
+                                                        className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all text-left border ${
                                                             isSelected
                                                             ? 'bg-lime-500/10 border-lime-500/30 text-lime-100'
-                                                            : 'bg-slate-950/30 border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                                            : 'bg-slate-950/40 border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                                                         }`}
                                                     >
-                                                        <span className="truncate">{ing.name}</span>
+                                                        <span className="truncate pr-2">{ing.name}</span>
                                                         {isSelected && <span className="text-lime-500">✓</span>}
                                                     </button>
                                                 );
@@ -268,8 +251,9 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
         </div>
 
         {categorized.length === 0 && (
-            <div className="text-center py-10 text-slate-500 text-sm">
-                No ingredients found matching "{searchQuery}"
+            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                <span className="text-2xl mb-2">🥃</span>
+                <p className="text-sm">No ingredients found.</p>
             </div>
         )}
       </div>
