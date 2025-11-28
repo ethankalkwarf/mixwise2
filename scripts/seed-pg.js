@@ -4,6 +4,14 @@ require('dotenv').config({ path: '.env.local' });
 
 const COCKTAIL_DB_BASE = 'https://www.thecocktaildb.com/api/json/v1/1';
 
+// Helper to force Title Case (e.g. "triple sec" -> "Triple Sec")
+function toTitleCase(str) {
+  return str.replace(
+    /\w\S*/g,
+    (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+  );
+}
+
 const CATEGORY_MAP = {
   'Ordinary Drink': 'Cocktail',
   'Cocktail': 'Cocktail',
@@ -19,17 +27,8 @@ const CATEGORY_MAP = {
 };
 
 const STAPLES = [
-  'Vodka',
-  'Gin',
-  'Rum',
-  'Tequila',
-  'Bourbon',
-  'Lemon Juice',
-  'Lime Juice',
-  'Simple Syrup',
-  'Sugar',
-  'Ice',
-  'Water',
+  'Vodka', 'Gin', 'Rum', 'Tequila', 'Bourbon', 'Lemon Juice', 'Lime Juice', 
+  'Simple Syrup', 'Sugar', 'Ice', 'Water', 'Club Soda', 'Tonic Water'
 ];
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -45,16 +44,21 @@ const client = new Client({
 });
 
 async function fetchCocktailsByLetter(letter) {
-  const res = await fetch(`${COCKTAIL_DB_BASE}/search.php?f=${letter}`);
-  const data = await res.json();
-  return data.drinks || [];
+  try {
+    const res = await fetch(`${COCKTAIL_DB_BASE}/search.php?f=${letter}`);
+    const data = await res.json();
+    return data.drinks || [];
+  } catch (e) {
+    console.error(`Failed to fetch letter ${letter}`);
+    return [];
+  }
 }
 
 async function seed() {
   console.log('🍹 Starting MixWise Seeder via pg...');
 
   await client.connect();
-  console.log('🔌 Connected to Postgres via DATABASE_URL');
+  console.log('🔌 Connected to Postgres.');
 
   const allDrinks = [];
   const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
@@ -67,48 +71,46 @@ async function seed() {
 
   console.log(`Found ${allDrinks.length} cocktails.`);
 
+  // Map to track unique ingredients by their NORMALIZED name
   const ingredientMap = new Map();
 
   allDrinks.forEach((drink) => {
     for (let i = 1; i <= 15; i++) {
-      const ingName = drink[`strIngredient${i}`];
-      if (ingName) {
-        const cleanName = ingName.trim();
+      const rawName = drink[`strIngredient${i}`];
+      if (rawName) {
+        // CLEANUP STEP: Trim and Title Case
+        const cleanName = toTitleCase(rawName.trim());
+        
         if (!ingredientMap.has(cleanName)) {
           let category = 'Mixer';
           const n = cleanName.toLowerCase();
 
           if (
-            n.includes('vodka') ||
-            n.includes('gin') ||
-            n.includes('rum') ||
-            n.includes('tequila') ||
-            n.includes('whiskey') ||
-            n.includes('bourbon') ||
-            n.includes('brandy')
+            n.includes('vodka') || n.includes('gin') || n.includes('rum') || 
+            n.includes('tequila') || n.includes('whiskey') || n.includes('bourbon') || 
+            n.includes('brandy') || n.includes('scotch') || n.includes('cognac')
           ) {
             category = 'Spirit';
           } else if (
-            n.includes('liqueur') ||
-            n.includes('schnapps') ||
-            n.includes('triple sec') ||
-            n.includes('vermouth')
+            n.includes('liqueur') || n.includes('schnapps') || n.includes('triple sec') || 
+            n.includes('vermouth') || n.includes('amaretto') || n.includes('campari') || 
+            n.includes('aperol')
           ) {
             category = 'Liqueur';
           } else if (
-            n.includes('juice') ||
-            n.includes('syrup') ||
-            n.includes('soda') ||
-            n.includes('water')
+            n.includes('wine') || n.includes('champagne') || n.includes('prosecco')
+          ) {
+            category = 'Wine';
+          } else if (
+            n.includes('juice') || n.includes('syrup') || n.includes('soda') || 
+            n.includes('water') || n.includes('cola') || n.includes('tonic')
           ) {
             category = 'Mixer';
           } else if (n.includes('bitters')) {
             category = 'Bitters';
           } else if (
-            n.includes('garnish') ||
-            n.includes('peel') ||
-            n.includes('wedge') ||
-            n.includes('slice')
+            n.includes('garnish') || n.includes('peel') || n.includes('wedge') || 
+            n.includes('slice') || n.includes('mint') || n.includes('olive')
           ) {
             category = 'Garnish';
           }
@@ -116,9 +118,7 @@ async function seed() {
           ingredientMap.set(cleanName, {
             name: cleanName,
             category,
-            image_url: `https://www.thecocktaildb.com/images/ingredients/${encodeURIComponent(
-              cleanName,
-            )}-Small.png`,
+            image_url: `https://www.thecocktaildb.com/images/ingredients/${encodeURIComponent(cleanName)}-Small.png`,
             is_staple: STAPLES.includes(cleanName),
           });
         }
@@ -128,49 +128,45 @@ async function seed() {
 
   console.log(`Identified ${ingredientMap.size} unique ingredients.`);
 
-  // Upsert ingredients via SQL
+  // 1. Upsert Ingredients
   const ingredients = Array.from(ingredientMap.values());
-
   for (const ing of ingredients) {
+    // ON CONFLICT (name): Ensure your DB has a UNIQUE constraint on the 'name' column for this to work perfectly.
+    // If not, the script relies on the fact that we deduped in JS first.
     await client.query(
       `
       INSERT INTO public.ingredients (name, category, image_url, is_staple)
       VALUES ($1, $2, $3, $4)
-      ON CONFLICT (name)
+      ON CONFLICT (name) 
       DO UPDATE SET
         category = EXCLUDED.category,
         image_url = EXCLUDED.image_url,
         is_staple = EXCLUDED.is_staple;
     `,
-      [ing.name, ing.category, ing.image_url, ing.is_staple],
+      [ing.name, ing.category, ing.image_url, ing.is_staple]
     );
   }
 
-  console.log('✅ Ingredients upserted.');
-
-  // Build ingredient ID map
-  const { rows: ingredientRows } = await client.query(
-    'SELECT id, name FROM public.ingredients;',
-  );
+  // 2. Build Map of Name -> ID
+  const { rows: ingredientRows } = await client.query('SELECT id, name FROM public.ingredients;');
   const ingIdMap = {};
   ingredientRows.forEach((row) => {
     ingIdMap[row.name] = row.id;
   });
 
-  console.log('Inserting cocktails and cocktail_ingredients...');
+  console.log('Inserting cocktails...');
 
+  // 3. Insert Cocktails & Junctions
   for (const drink of allDrinks) {
     if (!drink) continue;
 
-    const category =
-      CATEGORY_MAP[drink.strCategory] || 'Other';
+    const category = CATEGORY_MAP[drink.strCategory] || 'Other';
 
-    // Upsert cocktail
     const result = await client.query(
       `
       INSERT INTO public.cocktails (name, instructions, category, image_url, glass)
       VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (name)
+      ON CONFLICT (name) 
       DO UPDATE SET
         instructions = EXCLUDED.instructions,
         category = EXCLUDED.category,
@@ -178,49 +174,37 @@ async function seed() {
         glass = EXCLUDED.glass
       RETURNING id;
     `,
-      [
-        drink.strDrink,
-        drink.strInstructions,
-        category,
-        drink.strDrinkThumb,
-        drink.strGlass,
-      ],
+      [drink.strDrink, drink.strInstructions, category, drink.strDrinkThumb, drink.strGlass]
     );
 
     const cocktailId = result.rows[0].id;
-    const junctionInserts = [];
 
     for (let i = 1; i <= 15; i++) {
-      const ingName = drink[`strIngredient${i}`];
+      const rawName = drink[`strIngredient${i}`];
       const measure = drink[`strMeasure${i}`];
 
-      if (ingName && ingIdMap[ingName.trim()]) {
-        junctionInserts.push({
-          cocktail_id: cocktailId,
-          ingredient_id: ingIdMap[ingName.trim()],
-          measure: measure ? measure.trim() : null,
-        });
-      }
-    }
+      if (rawName) {
+        // Ensure we look up using the same normalization logic
+        const cleanName = toTitleCase(rawName.trim());
+        const ingId = ingIdMap[cleanName];
 
-    for (const row of junctionInserts) {
-      await client.query(
-        `
-        INSERT INTO public.cocktail_ingredients (cocktail_id, ingredient_id, measure)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (cocktail_id, ingredient_id)
-        DO UPDATE SET
-          measure = EXCLUDED.measure;
-      `,
-        [row.cocktail_id, row.ingredient_id, row.measure],
-      );
+        if (ingId) {
+          await client.query(
+            `
+            INSERT INTO public.cocktail_ingredients (cocktail_id, ingredient_id, measure)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (cocktail_id, ingredient_id) 
+            DO UPDATE SET measure = EXCLUDED.measure;
+          `,
+            [cocktailId, ingId, measure ? measure.trim() : null]
+          );
+        }
+      }
     }
   }
 
-  console.log('✅ Cocktails and ingredients seeded successfully.');
-
+  console.log('✅ Seeding complete!');
   await client.end();
-  console.log('🔌 Disconnected from Postgres.');
 }
 
 seed().catch((err) => {
@@ -228,4 +212,3 @@ seed().catch((err) => {
   client.end().catch(() => {});
   process.exit(1);
 });
-
