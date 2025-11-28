@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { getMatchGroups } from "@/lib/matching";
 import { Ingredient, Cocktail } from "@/lib/types";
 import { CocktailDialog } from "./CocktailDialog";
-import { PlusIcon } from "@heroicons/react/20/solid";
+import { PlusIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 
 type Props = {
   inventoryIds: number[];
@@ -25,9 +25,12 @@ export function ResultsPanel({
 }: Props) {
   const [selectedCocktail, setSelectedCocktail] = useState<Cocktail | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  
+  // New State for Filtering
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   // --- DERIVE STAPLES ---
-  // Fix: Calculate which IDs are staples so the matching engine knows to ignore them
   const stapleIds = useMemo(() => {
     return allIngredients
       .filter((i) => i.is_staple)
@@ -40,22 +43,43 @@ export function ResultsPanel({
       getMatchGroups({
         cocktails: allCocktails,
         ownedIngredientIds: inventoryIds,
-        stapleIngredientIds: stapleIds, // Pass the staples here
+        stapleIngredientIds: stapleIds,
         substitutions: [],
       }),
     [allCocktails, inventoryIds, stapleIds]
   );
 
-  // --- SORTING ---
-  const sortedMakeNow = useMemo(() => {
-    return [...makeNow].sort((a, b) => {
-      // 1. Popularity
+  // --- EXTRACT CATEGORIES ---
+  // Get unique categories from the "makeNow" list so we only show relevant filters
+  const availableCategories = useMemo(() => {
+    const cats = new Set(makeNow.map(m => m.cocktail.category));
+    return Array.from(cats).sort();
+  }, [makeNow]);
+
+  // --- SORTING & FILTERING ---
+  const filteredAndSortedMakeNow = useMemo(() => {
+    let results = [...makeNow];
+
+    // 1. Filter by Search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      results = results.filter(r => r.cocktail.name.toLowerCase().includes(q));
+    }
+
+    // 2. Filter by Category
+    if (activeCategory) {
+      results = results.filter(r => r.cocktail.category === activeCategory);
+    }
+
+    // 3. Sort
+    return results.sort((a, b) => {
+      // Favorite drinks first
       if (a.cocktail.is_popular && !b.cocktail.is_popular) return -1;
       if (!a.cocktail.is_popular && b.cocktail.is_popular) return 1;
-      // 2. Alphabetical
+      // Then alphabetical
       return a.cocktail.name.localeCompare(b.cocktail.name);
     });
-  }, [makeNow]);
+  }, [makeNow, searchQuery, activeCategory]);
 
   // --- SMART ADDITIONS LOGIC ---
   const unlockPotential = useMemo(() => {
@@ -103,7 +127,6 @@ export function ResultsPanel({
   const missingForSelected = useMemo(() => {
     if (!selectedCocktail) return [];
     const invSet = new Set(inventoryIds);
-    // Also consider staples as "owned" for the checklist in the dialog
     const stapleSet = new Set(stapleIds);
     
     return selectedCocktail.ingredients
@@ -123,27 +146,66 @@ export function ResultsPanel({
 
       {/* 1. READY TO MIX */}
       <div>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
                 <h2 className="text-2xl font-serif font-bold text-white">Ready to Mix</h2>
                 <div className="bg-lime-500/10 border border-lime-500/20 text-lime-400 px-3 py-0.5 rounded-full text-sm font-bold font-mono">
-                    {sortedMakeNow.length}
+                    {filteredAndSortedMakeNow.length}
                 </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+                <input 
+                    type="text" 
+                    placeholder="Search cocktails..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-lime-500/50 transition-all"
+                />
+                <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-slate-600" />
             </div>
         </div>
 
-        {sortedMakeNow.length === 0 && (
+        {/* Category Filters */}
+        {availableCategories.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-4 -mx-1 px-1">
+                <button 
+                    onClick={() => setActiveCategory(null)} 
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${activeCategory === null ? "bg-lime-500 text-slate-900 border-lime-500" : "bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800"}`}
+                >
+                    All
+                </button>
+                {availableCategories.map(cat => (
+                    <button 
+                        key={cat} 
+                        onClick={() => setActiveCategory(cat === activeCategory ? null : cat)} 
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${activeCategory === cat ? "bg-lime-500 text-slate-900 border-lime-500" : "bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800"}`}
+                    >
+                        {cat}
+                    </button>
+                ))}
+            </div>
+        )}
+
+        {/* Empty State */}
+        {filteredAndSortedMakeNow.length === 0 && (
           <div className="flex flex-col items-center justify-center p-12 border border-dashed border-slate-800 rounded-2xl bg-slate-900/30 text-center">
             <div className="text-5xl mb-4 opacity-80">🍸</div>
-            <h3 className="text-slate-200 font-semibold mb-2 text-lg">Your bar is looking a bit dry</h3>
-            <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
-                Add ingredients from the panel on the left to discover what you can make.
+            <h3 className="text-slate-200 font-semibold mb-2 text-lg">
+                {makeNow.length === 0 ? "Your bar is looking a bit dry" : "No matches found"}
+            </h3>
+            <p className="text-slate-500 text-sm max-w-sm leading-relaxed mx-auto">
+                {makeNow.length === 0 
+                    ? "Add ingredients from the panel on the left to discover what you can make." 
+                    : "Try adjusting your search or filters to see more results."}
             </p>
           </div>
         )}
 
+        {/* Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedMakeNow.map(({cocktail}) => (
+          {filteredAndSortedMakeNow.map(({cocktail}) => (
             <div
               key={cocktail.id}
               onClick={() => openRecipe(cocktail)}
@@ -221,7 +283,7 @@ export function ResultsPanel({
                              <span className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">Drinks</span>
                         </div>
                         
-                        {/* NAME (Sans Serif) & CATEGORY (Below) */}
+                        {/* NAME & CATEGORY */}
                         <div className="flex flex-col min-w-0 pt-1">
                             <h4 className="font-bold text-slate-100 text-lg leading-tight break-words">
                                 {item.name}
@@ -232,7 +294,7 @@ export function ResultsPanel({
                         </div>
                     </div>
                     
-                    {/* ADD BUTTON - Moved to bottom */}
+                    {/* ADD BUTTON */}
                     <button
                         onClick={() => onAddToInventory(item.id)}
                         className="mt-auto w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-lime-500/10 text-lime-400 border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all font-bold text-xs uppercase tracking-wide"
