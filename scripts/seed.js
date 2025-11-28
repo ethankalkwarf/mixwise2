@@ -1,8 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
-// Use the public URL plus the SERVICE ROLE key for seeding.
-// This runs on your machine only and is not exposed to the browser.
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -28,8 +26,7 @@ const CATEGORY_MAP = {
   'Other / Unknown': 'Other'
 };
 
-// UPDATED: Spirits removed so they are treated as inventory items.
-// Only true basics (Ice, Water, Sugar, etc.) remain as staples.
+// UPDATED: Spirits removed. Only true basics are staples.
 const STAPLES = [
   'Lemon Juice',
   'Lime Juice',
