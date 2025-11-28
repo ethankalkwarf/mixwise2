@@ -24,7 +24,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
       <body className="bg-slate-950 text-slate-50 font-sans selection:bg-lime-500/30">
         <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black -z-10" />
-        
+
         <SupabaseProvider initialSession={null}>
           <div className="min-h-screen flex flex-col">
             <header className="border-b border-white/5 bg-slate-950/50 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
