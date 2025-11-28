@@ -163,7 +163,7 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                                 }`}
                             >
                                 <span className="text-2xl mb-1.5 filter drop-shadow-md transition-transform group-hover:scale-110">
-                                    {ing.name === "Gin" ? "🌸" : // Requested update
+                                    {ing.name === "Gin" ? "🌸" : 
                                      ing.name === "Vodka" ? "🍸" : 
                                      ing.name === "Tequila" ? "🌵" :
                                      (ing.name.includes("Whiskey") || ing.name.includes("Bourbon")) ? "🥃" :
@@ -183,14 +183,12 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
         {/* Categorized Accordions */}
         <div className="space-y-3">
             {categorized.map(([category, list]) => {
-                // Determine if open: if searching/filtering, always open. Otherwise, check if items selected.
+                // Determine if open: if searching/filtering, always open. Otherwise, CLOSED (collapsed by default).
                 const isSearching = searchQuery.length > 0 || activeFilter !== null;
                 const hasSelection = list.some(i => selectedSet.has(i.id));
-                // Default open Spirits and Liqueurs for easy access if no search
-                const isPriority = !isSearching && ["Spirit", "Liqueur", "Mixer"].includes(category);
 
                 return (
-                    <Disclosure key={category} defaultOpen={isSearching || hasSelection || isPriority}>
+                    <Disclosure key={category} defaultOpen={isSearching || hasSelection}>
                         {({ open }) => (
                             <div className={`rounded-xl border transition-all duration-300 ${open ? 'bg-slate-900/50 border-slate-700' : 'bg-transparent border-transparent'}`}>
                                 <Disclosure.Button className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-slate-800/50 transition-colors group">
@@ -249,13 +247,6 @@ export function InventoryPanel({ ingredients, selectedIds, onChange }: Props) {
                 );
             })}
         </div>
-
-        {categorized.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                <span className="text-2xl mb-2">🥃</span>
-                <p className="text-sm">No ingredients found.</p>
-            </div>
-        )}
       </div>
     </section>
   );
