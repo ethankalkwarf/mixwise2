@@ -74,6 +74,7 @@ export function ResultsPanel({
             return {
                 id,
                 name: ing?.name || "Unknown",
+                category: ing?.category || "Other", // Added category here
                 count: data.count,
                 totalUsage: totalUsageCounts.get(id) || 0,
                 drinks: data.drinks
@@ -189,7 +190,7 @@ export function ResultsPanel({
         </div>
       </div>
 
-      {/* 2. SMART ADDITIONS - Simplified */}
+      {/* 2. SMART ADDITIONS - REDESIGNED */}
       {unlockPotential.length > 0 && (
       <div className="border-t border-slate-800/50 pt-10">
         <div className="flex items-center gap-3 mb-6">
@@ -197,28 +198,35 @@ export function ResultsPanel({
             <span className="text-sm text-slate-500">Unlocks new recipes</span>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
              {unlockPotential.map(item => (
-                 <div key={item.id} className="group flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-lime-500/30 transition-all">
+                 <div key={item.id} className="group flex flex-col p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-lime-500/30 transition-all h-full">
                     
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-start gap-4 mb-4">
                         {/* UNLOCKS BADGE */}
-                        <div className="flex-shrink-0 w-12 h-12 bg-slate-800 rounded-lg flex flex-col items-center justify-center border border-white/5 group-hover:bg-slate-800/80 transition-colors">
-                             <span className="text-lg font-bold text-lime-400 leading-none">+{item.count}</span>
+                        <div className="flex-shrink-0 w-14 h-14 bg-slate-800 rounded-xl flex flex-col items-center justify-center border border-white/5 group-hover:bg-slate-800/80 transition-colors">
+                             <span className="text-xl font-bold text-lime-400 leading-none">+{item.count}</span>
+                             <span className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">Drinks</span>
                         </div>
                         
-                        {/* NAME */}
-                        <h4 className="font-bold text-slate-200 text-sm truncate pr-2">
-                            {item.name}
-                        </h4>
+                        {/* NAME & CATEGORY */}
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">
+                                {item.category}
+                            </span>
+                            <h4 className="font-serif font-bold text-slate-100 text-lg leading-tight break-words">
+                                {item.name}
+                            </h4>
+                        </div>
                     </div>
                     
-                    {/* ADD BUTTON */}
+                    {/* ADD BUTTON - Moved to bottom */}
                     <button
                         onClick={() => onAddToInventory(item.id)}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-lime-500/10 text-lime-400 border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all font-bold text-xs"
+                        className="mt-auto w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-lime-500/10 text-lime-400 border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all font-bold text-xs uppercase tracking-wide"
                     >
-                        <PlusIcon className="w-3 h-3" /> Add
+                        <PlusIcon className="w-4 h-4" /> 
+                        Add
                     </button>
                  </div>
              ))}
