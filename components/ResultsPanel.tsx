@@ -26,16 +26,24 @@ export function ResultsPanel({
   const [selectedCocktail, setSelectedCocktail] = useState<Cocktail | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // --- DERIVE STAPLES ---
+  // Fix: Calculate which IDs are staples so the matching engine knows to ignore them
+  const stapleIds = useMemo(() => {
+    return allIngredients
+      .filter((i) => i.is_staple)
+      .map((i) => i.id);
+  }, [allIngredients]);
+
   // --- MATCHING ENGINE ---
   const { makeNow, almostThere } = useMemo(
     () =>
       getMatchGroups({
         cocktails: allCocktails,
         ownedIngredientIds: inventoryIds,
-        stapleIngredientIds: [],
+        stapleIngredientIds: stapleIds, // Pass the staples here
         substitutions: [],
       }),
-    [allCocktails, inventoryIds]
+    [allCocktails, inventoryIds, stapleIds]
   );
 
   // --- SORTING ---
@@ -95,10 +103,13 @@ export function ResultsPanel({
   const missingForSelected = useMemo(() => {
     if (!selectedCocktail) return [];
     const invSet = new Set(inventoryIds);
+    // Also consider staples as "owned" for the checklist in the dialog
+    const stapleSet = new Set(stapleIds);
+    
     return selectedCocktail.ingredients
-      .filter((i) => !i.isOptional && !invSet.has(i.id))
+      .filter((i) => !i.isOptional && !invSet.has(i.id) && !stapleSet.has(i.id))
       .map((i) => i.id);
-  }, [selectedCocktail, inventoryIds]);
+  }, [selectedCocktail, inventoryIds, stapleIds]);
 
   return (
     <section className="space-y-12 pb-24">
