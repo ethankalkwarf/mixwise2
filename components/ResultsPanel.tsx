@@ -31,7 +31,6 @@ export function ResultsPanel({
   const [selectedCocktail, setSelectedCocktail] = useState<Cocktail | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // ... (Keep existing useMemo logic for stapleIds and substitutions) ...
   const stapleIds = useMemo(
     () => allIngredients.filter((i) => i.is_staple).map((i) => i.id),
     [allIngredients],
@@ -62,7 +61,7 @@ export function ResultsPanel({
     return rules;
   }, [allIngredients]);
 
-  const {QHmakeNow, almostThere } = useMemo(
+  const { makeNow, almostThere: almostThereGroups } = useMemo(
     () =>
       getMatchGroups({
         cocktails: allCocktails,
@@ -70,20 +69,8 @@ export function ResultsPanel({
         stapleIngredientIds: stapleIds,
         substitutions,
       }),
-    [allCocktails, inventoryIds, stapleIds, substitutions]
+    [allCocktails, inventoryIds, stapleIds, substitutions],
   );
-  // ... (End of logic reuse) ...
-
-  const { makeNow, almostThere: almostThereGroups } = useMemo(
-      () =>
-        getMatchGroups({
-          cocktails: allCocktails,
-          ownedIngredientIds: inventoryIds,
-          stapleIngredientIds: stapleIds,
-          substitutions,
-        }),
-      [allCocktails, inventoryIds, stapleIds, substitutions],
-    );
 
   function openRecipe(cocktail: Cocktail) {
     setSelectedCocktail(cocktail);
@@ -128,7 +115,7 @@ export function ResultsPanel({
         )}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {makeNow.map(({WBcocktail}) => (
+          {makeNow.map(({cocktail}) => (
             <div
               key={cocktail.id}
               onClick={() => openRecipe(cocktail)}
