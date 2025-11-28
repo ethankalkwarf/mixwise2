@@ -38,10 +38,10 @@ export function ResultsPanel({
     [allCocktails, inventoryIds]
   );
 
-  // --- SORTING & UNLOCK LOGIC ---
+  // --- SORTING ---
   const sortedMakeNow = useMemo(() => {
     return [...makeNow].sort((a, b) => {
-      // Popular drinks first
+      // Favorite drinks first
       if (a.cocktail.is_popular && !b.cocktail.is_popular) return -1;
       if (!a.cocktail.is_popular && b.cocktail.is_popular) return 1;
       // Then alphabetical
@@ -49,6 +49,7 @@ export function ResultsPanel({
     });
   }, [makeNow]);
 
+  // --- SMART UNLOCK LOGIC ---
   const unlockPotential = useMemo(() => {
     const immediateUnlockCounts = new Map<number, { count: number; drinks: string[] }>();
     almostThere.forEach(match => {
@@ -150,7 +151,7 @@ export function ResultsPanel({
                     <div className="h-full w-full flex items-center justify-center text-slate-700 text-4xl">🥃</div>
                 )}
                 
-                {/* Popular Badge - Text changed to FAVORITE */}
+                {/* FAVORITE Badge */}
                 {cocktail.is_popular && (
                     <div className="absolute top-3 left-3 bg-amber-500/90 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded shadow-lg backdrop-blur-sm flex items-center gap-1 z-20">
                         ★ FAVORITE
@@ -190,28 +191,29 @@ export function ResultsPanel({
         </div>
       </div>
 
-      {/* 2. Unlock Opportunities */}
+      {/* 2. Unlock Opportunities (Smart Additions) */}
       {unlockPotential.length > 0 && (
       <div className="mt-12 pt-8 border-t border-slate-800/50">
         <div className="flex items-center gap-3 mb-6">
             <h2 className="text-2xl font-serif font-bold text-white">Smart Additions</h2>
-            <span className="text-sm text-slate-500">Items that unlock the most new drinks</span>
+            <span className="text-sm text-slate-500">Buy a bottle to unlock new drinks</span>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
              {unlockPotential.map(item => (
-                 // Updated padding here (p-2 pr-3) to prevent button overflow
-                 <div key={item.id} className="group flex items-center justify-between p-2 pr-3 rounded-xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 transition-all">
-                    <div className="flex items-center gap-4 min-w-0">
-                        <div className="bg-slate-800 h-16 w-16 rounded-xl flex flex-col items-center justify-center border border-white/5 group-hover:bg-slate-800/80 transition-colors flex-shrink-0">
-                             <span className="text-lg font-bold text-lime-400">+{item.count}</span>
-                             <span className="text-[9px] text-slate-500 uppercase tracking-wide">New</span>
+                 <div key={item.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-lime-500/30 transition-all gap-4">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                        {/* UNLOCKS Badge */}
+                        <div className="bg-slate-800 h-14 w-14 rounded-lg flex flex-col items-center justify-center border border-white/5 group-hover:bg-slate-800/80 transition-colors flex-shrink-0">
+                             <span className="text-xl font-bold text-lime-400 leading-none">+{item.count}</span>
+                             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Drinks</span>
                         </div>
-                        <div className="py-1 min-w-0 flex-1">
-                            <h4 className="font-bold text-slate-200 group-hover:text-white transition-colors truncate">{item.name}</h4>
+                        
+                        <div className="flex flex-col min-w-0">
+                            <h4 className="font-bold text-slate-100 text-sm sm:text-base truncate">{item.name}</h4>
                             <div className="flex flex-col gap-0.5">
-                                <p className="text-[10px] text-slate-500 truncate">
-                                    Unlocks: {item.drinks.slice(0, 1).join("")} {item.drinks.length > 1 && `& ${item.drinks.length - 1} more`}
+                                <p className="text-[11px] text-slate-400 truncate">
+                                    <span className="text-lime-500/80 font-medium">Makes now:</span> {item.drinks.slice(0, 2).join(", ")}{item.drinks.length > 2 && "..."}
                                 </p>
                                 <p className="text-[10px] text-slate-600">
                                     Used in {item.totalUsage} total recipes
@@ -220,11 +222,13 @@ export function ResultsPanel({
                         </div>
                     </div>
                     
+                    {/* Explicit ADD TO BAR button */}
                     <button
                         onClick={() => onAddToInventory(item.id)}
-                        className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 ml-2 rounded-lg bg-lime-500/10 text-lime-400 text-xs font-bold border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all"
+                        className="w-full sm:w-auto whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-lime-500 text-slate-950 text-xs font-bold hover:bg-lime-400 transition-colors shadow-lg shadow-lime-500/10"
                     >
-                        <PlusIcon className="w-3 h-3" /> Add
+                        <PlusIcon className="w-4 h-4" /> 
+                        Add to Bar
                     </button>
                  </div>
              ))}
