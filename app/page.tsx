@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { InventoryPanel } from '@/components/InventoryPanel';
 import { ResultsPanel } from '@/components/ResultsPanel';
 import { Ingredient, Cocktail } from '@/lib/types';
@@ -9,24 +9,18 @@ import { loadInventory, saveInventory } from '@/lib/inventoryApi';
 
 export default function HomePage() {
   const supabase = useSupabaseClient();
-  const user = useUser();
-
+  
+  // State
   const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
   const [allCocktails, setAllCocktails] = useState<Cocktail[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
-
   const [inventoryIds, setInventoryIds] = useState<number[]>([]);
-  const [inventoryId, setInventoryId] = useState<number | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
-  const [shoppingList, setShoppingList] = useState<number[]>([]);
 
-  // Load ingredient + cocktail data
+  // 1. Load Static Data (Public)
   useEffect(() => {
     async function fetchData() {
-      const { data: ingData } = await supabase
-        .from('ingredients')
-        .select('*')
-        .order('name');
+      const { data: ingData } = await supabase.from('ingredients').select('*').order('name');
       if (ingData) setAllIngredients(ingData);
 
       const { data: drinkData } = await supabase
@@ -55,110 +49,50 @@ export default function HomePage() {
         }));
         setAllCocktails(formatted);
       }
-
       setDataLoading(false);
     }
-
     fetchData();
   }, [supabase]);
 
-  // Load user-specific data (inventory, favorites, shopping list)
+  // 2. Load Local User Data (No Login Required)
   useEffect(() => {
-    if (!user) {
-      setInventoryIds([]);
-      setFavoriteIds([]);
-      setShoppingList([]);
-      return;
-    }
-
-    // ✅ FIX: Extract userId OUTSIDE async function so TS knows it's non-null
-    const userId = user.id;
-
-    async function loadUserData() {
-      const { inventoryId: invId, ingredientIds } = await loadInventory(supabase);
-      setInventoryId(invId);
+    async function loadLocal() {
+      const { ingredientIds } = await loadInventory(supabase);
       setInventoryIds(ingredientIds);
-
-      const { data: favData } = await supabase
-        .from('favorites')
-        .select('cocktail_id')
-        .eq('user_id', userId);
-
-      if (favData) setFavoriteIds(favData.map((f) => f.cocktail_id));
-
-      const { data: shopData } = await supabase
-        .from('shopping_list')
-        .select('ingredient_id')
-        .eq('user_id', userId);
-
-      if (shopData) setShoppingList(shopData.map((s) => s.ingredient_id));
+      // Future: Load favorites from local storage too
     }
+    loadLocal();
+  }, []);
 
-    loadUserData();
-  }, [user, supabase]);
-
-  // Inventory updates
+  // 3. Actions
   const handleInventoryChange = async (newIds: number[]) => {
     setInventoryIds(newIds);
-    if (user && inventoryId) {
-      await saveInventory(supabase, inventoryId, newIds);
+    await saveInventory(supabase, 0, newIds);
+  };
+
+  const handleAddToInventory = (id: number) => {
+    if (!inventoryIds.includes(id)) {
+        const next = [...inventoryIds, id];
+        handleInventoryChange(next);
     }
   };
 
-  // Favorites
-  const handleToggleFavorite = async (id: number) => {
-    if (!user) return alert("Please sign in.");
-    const userId = user.id;
-
-    const isFav = favoriteIds.includes(id);
-    if (isFav) {
-      await supabase
-        .from('favorites')
-        .delete()
-        .eq('user_id', userId)
-        .eq('cocktail_id', id);
-
-      setFavoriteIds((prev) => prev.filter((i) => i !== id));
-    } else {
-      await supabase.from('favorites').insert({
-        user_id: userId,
-        cocktail_id: id,
-      });
-      setFavoriteIds((prev) => [...prev, id]);
-    }
-  };
-
-  // Shopping list
-  const handleToggleShopping = async (id: number) => {
-    if (!user) return alert("Please sign in.");
-    const userId = user.id;
-
-    const isShop = shoppingList.includes(id);
-    if (isShop) {
-      await supabase
-        .from('shopping_list')
-        .delete()
-        .eq('user_id', userId)
-        .eq('ingredient_id', id);
-
-      setShoppingList((prev) => prev.filter((i) => i !== id));
-    } else {
-      await supabase.from('shopping_list').insert({
-        user_id: userId,
-        ingredient_id: id,
-      });
-
-      setShoppingList((prev) => [...prev, id]);
-    }
+  const handleToggleFavorite = (id: number) => {
+      if (favoriteIds.includes(id)) {
+          setFavoriteIds(prev => prev.filter(f => f !== id));
+      } else {
+          setFavoriteIds(prev => [...prev, id]);
+      }
+      // TODO: Save favorites to local storage
   };
 
   if (dataLoading)
-    return <div className="text-white text-center py-20">Loading MixWise...</div>;
+    return <div className="text-white text-center py-20 animate-pulse">Loading MixWise...</div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="grid lg:grid-cols-[1fr_1.5fr] gap-8 items-start">
-        <div className="lg:sticky lg:top-6">
+        <div className="lg:sticky lg:top-24">
           <InventoryPanel
             ingredients={allIngredients}
             selectedIds={inventoryIds}
@@ -172,8 +106,7 @@ export default function HomePage() {
             allIngredients={allIngredients}
             favoriteIds={favoriteIds}
             onToggleFavorite={handleToggleFavorite}
-            shoppingList={shoppingList}
-            onToggleShoppingList={handleToggleShopping}
+            onAddToInventory={handleAddToInventory}
           />
         </div>
       </div>
