@@ -74,7 +74,7 @@ export function ResultsPanel({
             return {
                 id,
                 name: ing?.name || "Unknown",
-                category: ing?.category || "Other", // Added category here
+                category: ing?.category || "Other",
                 count: data.count,
                 totalUsage: totalUsageCounts.get(id) || 0,
                 drinks: data.drinks
@@ -190,7 +190,7 @@ export function ResultsPanel({
         </div>
       </div>
 
-      {/* 2. SMART ADDITIONS - REDESIGNED */}
+      {/* 2. SMART ADDITIONS */}
       {unlockPotential.length > 0 && (
       <div className="border-t border-slate-800/50 pt-10">
         <div className="flex items-center gap-3 mb-6">
@@ -198,7 +198,8 @@ export function ResultsPanel({
             <span className="text-sm text-slate-500">Unlocks new recipes</span>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {/* 2 Columns Wide */}
+        <div className="grid gap-4 sm:grid-cols-2">
              {unlockPotential.map(item => (
                  <div key={item.id} className="group flex flex-col p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-lime-500/30 transition-all h-full">
                     
@@ -209,14 +210,14 @@ export function ResultsPanel({
                              <span className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">Drinks</span>
                         </div>
                         
-                        {/* NAME & CATEGORY */}
-                        <div className="flex flex-col min-w-0">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">
-                                {item.category}
-                            </span>
-                            <h4 className="font-serif font-bold text-slate-100 text-lg leading-tight break-words">
+                        {/* NAME (Sans Serif) & CATEGORY (Below) */}
+                        <div className="flex flex-col min-w-0 pt-1">
+                            <h4 className="font-bold text-slate-100 text-lg leading-tight break-words">
                                 {item.name}
                             </h4>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
+                                {item.category}
+                            </span>
                         </div>
                     </div>
                     
@@ -226,7 +227,7 @@ export function ResultsPanel({
                         className="mt-auto w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-lime-500/10 text-lime-400 border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all font-bold text-xs uppercase tracking-wide"
                     >
                         <PlusIcon className="w-4 h-4" /> 
-                        Add
+                        Add to Bar
                     </button>
                  </div>
              ))}
