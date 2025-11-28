@@ -1,7 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { SupabaseProvider } from './providers';
-import { HeaderAuth } from '@/components/HeaderAuth';
 import { Inter, Playfair_Display } from 'next/font/google';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -36,7 +35,7 @@ export default function RootLayout({
                   MixWise
                 </span>
               </div>
-              <HeaderAuth />
+              {/* Guest Mode Badge Removed */}
             </header>
             <main className="flex-1">{children}</main>
           </div>
