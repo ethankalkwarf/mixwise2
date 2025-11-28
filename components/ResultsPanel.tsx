@@ -3,20 +3,22 @@
 import { useMemo, useState } from "react";
 import { getMatchGroups } from "@/lib/matching";
 import { Ingredient, Cocktail, SubstitutionRule } from "@/lib/types";
+// 👇 THIS IS THE KEY FIX: Importing CocktailDialog instead of RecipeDialog
 import { CocktailDialog } from "./CocktailDialog";
+import { PlusIcon } from "@heroicons/react/20/solid";
 
 type Props = {
   inventoryIds: number[];
   allCocktails: Cocktail[];
   allIngredients: Ingredient[];
-  // Removed old shopping list props as we are switching to "Unlock" logic
-  // shoppingList: number[];
-  // onToggleShoppingList: (id: number) => void;
   favoriteIds: number[];
   onToggleFavorite: (cocktailId: number) => void;
-  // Added ability to add to inventory from here
   onAddToInventory: (id: number) => void;
 };
+
+function normalizeName(name: string): string {
+  return name.toLowerCase().trim();
+}
 
 export function ResultsPanel({
   inventoryIds,
@@ -29,54 +31,78 @@ export function ResultsPanel({
   const [selectedCocktail, setSelectedCocktail] = useState<Cocktail | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Assuming staples logic is handled DB-side now (is_staple = true)
-  // But we pass empty here for matching to rely on the DB flag logic if implemented in matching.ts
-  // Or if matching.ts still expects stapleIds, we can fetch them.
-  // For this "Unlock" view, we focus on non-staples.
-  
+  // --- MATCHING ENGINE ---
   const { makeNow, almostThere } = useMemo(
     () =>
       getMatchGroups({
         cocktails: allCocktails,
         ownedIngredientIds: inventoryIds,
-        stapleIngredientIds: [], // Staples should be marked in DB now
-        substitutions: [], // Simplification for now
+        stapleIngredientIds: [], // Staples are handled via DB flag now
+        substitutions: [],
       }),
     [allCocktails, inventoryIds]
   );
 
-  // --- "UNLOCK" LOGIC ---
-  // Calculate which missing ingredients unlock the most drinks
+  // --- SORTING & UNLOCK LOGIC ---
+
+  // 1. Sort "Ready to Mix" by Popularity first
+  const sortedMakeNow = useMemo(() => {
+    return [...makeNow].sort((a, b) => {
+      // Popular drinks first
+      if (a.cocktail.is_popular && !b.cocktail.is_popular) return -1;
+      if (!a.cocktail.is_popular && b.cocktail.is_popular) return 1;
+      // Then alphabetical
+      return a.cocktail.name.localeCompare(b.cocktail.name);
+    });
+  }, [makeNow]);
+
+  // 2. Calculate Smart "Unlock" Suggestions
   const unlockPotential = useMemo(() => {
-    const counts = new Map<number, { count: number; drinks: string[] }>();
+    // A. Count immediate unlocks (from "Almost There" list)
+    const immediateUnlockCounts = new Map<number, { count: number; drinks: string[] }>();
 
     almostThere.forEach(match => {
         const missingId = match.missingRequiredIngredientIds[0];
         if (!missingId) return;
 
-        const current = counts.get(missingId) || { count: 0, drinks: [] };
+        const current = immediateUnlockCounts.get(missingId) || { count: 0, drinks: [] };
         current.count += 1;
         if (current.drinks.length < 3) {
             current.drinks.push(match.cocktail.name);
         }
-        counts.set(missingId, current);
+        immediateUnlockCounts.set(missingId, current);
     });
 
-    // Convert to array and sort by impact
-    return Array.from(counts.entries())
+    // B. Count total usage in ALL cocktails (Long-term value)
+    const totalUsageCounts = new Map<number, number>();
+    allCocktails.forEach(c => {
+        c.ingredients.forEach(ing => {
+            totalUsageCounts.set(ing.id, (totalUsageCounts.get(ing.id) || 0) + 1);
+        });
+    });
+
+    // C. Combine & Sort
+    return Array.from(immediateUnlockCounts.entries())
         .map(([id, data]) => {
             const ing = allIngredients.find(i => i.id === id);
             return {
                 id,
                 name: ing?.name || "Unknown",
-                category: ing?.category || "Other",
-                count: data.count,
+                count: data.count, // Immediate unlocks
+                totalUsage: totalUsageCounts.get(id) || 0, // Long-term value
                 drinks: data.drinks
             };
         })
-        .sort((a, b) => b.count - a.count); // Highest impact first
+        .sort((a, b) => {
+            // Primary Sort: How many NEW drinks does it unlock right now?
+            if (b.count !== a.count) return b.count - a.count;
+            
+            // Secondary Sort: How many TOTAL drinks use this ingredient?
+            // (Tie-breaker: Buy the more versatile bottle)
+            return b.totalUsage - a.totalUsage;
+        });
 
-  }, [almostThere, allIngredients]);
+  }, [almostThere, allCocktails, allIngredients]);
 
 
   function openRecipe(cocktail: Cocktail) {
@@ -93,7 +119,7 @@ export function ResultsPanel({
   }, [selectedCocktail, inventoryIds]);
 
   return (
-    <section className="space-y-8 pb-24">
+    <section className="space-y-10 pb-24">
       <CocktailDialog
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -108,12 +134,12 @@ export function ResultsPanel({
             <div className="flex items-center gap-3">
                 <h2 className="text-2xl font-serif font-bold text-white">Ready to Mix</h2>
                 <div className="bg-lime-500/10 border border-lime-500/20 text-lime-400 px-3 py-0.5 rounded-full text-sm font-bold font-mono">
-                    {makeNow.length}
+                    {sortedMakeNow.length}
                 </div>
             </div>
         </div>
 
-        {makeNow.length === 0 && (
+        {sortedMakeNow.length === 0 && (
           <div className="flex flex-col items-center justify-center p-12 border border-dashed border-slate-800 rounded-2xl bg-slate-900/30 text-center">
             <div className="text-5xl mb-4 opacity-80">🍸</div>
             <h3 className="text-slate-200 font-semibold mb-2 text-lg">Your bar is looking a bit dry</h3>
@@ -124,13 +150,12 @@ export function ResultsPanel({
         )}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {makeNow.map(({cocktail}) => (
+          {sortedMakeNow.map(({cocktail}) => (
             <div
               key={cocktail.id}
               onClick={() => openRecipe(cocktail)}
               className="cursor-pointer group relative flex flex-col overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 hover:border-lime-500/40 hover:shadow-xl hover:shadow-lime-900/10 transition-all duration-300"
             >
-              {/* Image Area */}
               <div className="relative h-48 w-full overflow-hidden bg-slate-800">
                 {cocktail.image_url ? (
                   <>
@@ -144,18 +169,25 @@ export function ResultsPanel({
                 ) : (
                     <div className="h-full w-full flex items-center justify-center text-slate-700 text-4xl">🥃</div>
                 )}
+                
+                {/* Popular Badge */}
+                {cocktail.is_popular && (
+                    <div className="absolute top-3 left-3 bg-amber-500/90 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded shadow-lg backdrop-blur-sm flex items-center gap-1 z-20">
+                        ★ POPULAR
+                    </div>
+                )}
+
                 <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleFavorite(cocktail.id);
                     }}
-                    className="absolute top-3 right-3 p-2 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 transition-colors text-white/80 hover:text-red-500"
+                    className="absolute top-3 right-3 p-2 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 transition-colors text-white/80 hover:text-red-500 z-20"
                 >
                     {favoriteIds.includes(cocktail.id) ? "♥" : "♡"}
                 </button>
               </div>
               
-              {/* Content Area */}
               <div className="p-4 flex-1 flex flex-col relative z-10 -mt-12">
                 <div className="bg-slate-900/95 backdrop-blur-md rounded-xl p-4 border border-white/5 shadow-lg flex-1 flex flex-col">
                     <div className="flex justify-between items-start mb-2">
@@ -178,7 +210,7 @@ export function ResultsPanel({
         </div>
       </div>
 
-      {/* 2. Unlock Opportunities (Replaces Shop) */}
+      {/* 2. Unlock Opportunities */}
       {unlockPotential.length > 0 && (
       <div className="mt-12 pt-8 border-t border-slate-800/50">
         <div className="flex items-center gap-3 mb-6">
@@ -190,22 +222,28 @@ export function ResultsPanel({
              {unlockPotential.map(item => (
                  <div key={item.id} className="group flex items-center justify-between p-1 pr-2 rounded-xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 transition-all">
                     <div className="flex items-center gap-4">
-                        <div className="bg-slate-800 h-16 w-16 rounded-l-xl flex items-center justify-center text-2xl border-r border-white/5 group-hover:bg-slate-800/80 transition-colors">
+                        <div className="bg-slate-800 h-16 w-16 rounded-l-xl flex flex-col items-center justify-center border-r border-white/5 group-hover:bg-slate-800/80 transition-colors">
                              <span className="text-lg font-bold text-lime-400">+{item.count}</span>
+                             <span className="text-[9px] text-slate-500 uppercase tracking-wide">New</span>
                         </div>
-                        <div className="py-2">
-                            <h4 className="font-bold text-slate-200 group-hover:text-white transition-colors">{item.name}</h4>
-                            <p className="text-[10px] text-slate-500">
-                                Unlocks: {item.drinks.slice(0, 2).join(", ")} {item.drinks.length > 2 && "& more"}
-                            </p>
+                        <div className="py-2 min-w-0 flex-1">
+                            <h4 className="font-bold text-slate-200 group-hover:text-white transition-colors truncate">{item.name}</h4>
+                            <div className="flex flex-col gap-0.5">
+                                <p className="text-[10px] text-slate-500 truncate">
+                                    Unlocks: {item.drinks.slice(0, 1).join("")} {item.drinks.length > 1 && `& ${item.drinks.length - 1} more`}
+                                </p>
+                                <p className="text-[10px] text-slate-600">
+                                    Used in {item.totalUsage} total recipes
+                                </p>
+                            </div>
                         </div>
                     </div>
                     
                     <button
                         onClick={() => onAddToInventory(item.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-lime-500/10 text-lime-400 text-xs font-bold border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all"
+                        className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-lime-500/10 text-lime-400 text-xs font-bold border border-lime-500/20 hover:bg-lime-500 hover:text-slate-900 hover:border-lime-500 transition-all"
                     >
-                        Add
+                        <PlusIcon className="w-3 h-3" /> Add
                     </button>
                  </div>
              ))}
