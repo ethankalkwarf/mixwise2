@@ -38,7 +38,8 @@ export function ResultsPanel({
   }, [allIngredients]);
 
   // --- MATCHING ENGINE ---
-  const { makeNow, almostThere } = useMemo(
+  // We now destructure 'all' as well to search the entire database
+  const { makeNow, almostThere, all } = useMemo(
     () =>
       getMatchGroups({
         cocktails: allCocktails,
@@ -50,36 +51,47 @@ export function ResultsPanel({
   );
 
   // --- EXTRACT CATEGORIES ---
-  // Get unique categories from the "makeNow" list so we only show relevant filters
   const availableCategories = useMemo(() => {
-    const cats = new Set(makeNow.map(m => m.cocktail.category));
+    // If searching, show categories from ALL matches, otherwise just from Ready to Mix
+    const source = searchQuery ? all : makeNow;
+    const cats = new Set(source.map(m => m.cocktail.category));
     return Array.from(cats).sort();
-  }, [makeNow]);
+  }, [makeNow, all, searchQuery]);
 
   // --- SORTING & FILTERING ---
-  const filteredAndSortedMakeNow = useMemo(() => {
-    let results = [...makeNow];
+  const displayedDrinks = useMemo(() => {
+    // 1. Determine Source: Search ? All : Ready
+    let results = searchQuery ? [...all] : [...makeNow];
 
-    // 1. Filter by Search
+    // 2. Filter by Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       results = results.filter(r => r.cocktail.name.toLowerCase().includes(q));
     }
 
-    // 2. Filter by Category
+    // 3. Filter by Category
     if (activeCategory) {
       results = results.filter(r => r.cocktail.category === activeCategory);
     }
 
-    // 3. Sort
+    // 4. Sort
     return results.sort((a, b) => {
+      // If searching, prioritize "Ready to mix" drinks first
+      if (searchQuery) {
+         const aReady = a.missingRequiredIngredientIds.length === 0;
+         const bReady = b.missingRequiredIngredientIds.length === 0;
+         if (aReady && !bReady) return -1;
+         if (!aReady && bReady) return 1;
+      }
+
       // Favorite drinks first
       if (a.cocktail.is_popular && !b.cocktail.is_popular) return -1;
       if (!a.cocktail.is_popular && b.cocktail.is_popular) return 1;
+      
       // Then alphabetical
       return a.cocktail.name.localeCompare(b.cocktail.name);
     });
-  }, [makeNow, searchQuery, activeCategory]);
+  }, [makeNow, all, searchQuery, activeCategory]);
 
   // --- SMART ADDITIONS LOGIC ---
   const unlockPotential = useMemo(() => {
@@ -144,13 +156,15 @@ export function ResultsPanel({
         inventoryIds={inventoryIds}
       />
 
-      {/* 1. READY TO MIX */}
+      {/* 1. HEADER & SEARCH */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-serif font-bold text-white">Ready to Mix</h2>
-                <div className="bg-lime-500/10 border border-lime-500/20 text-lime-400 px-3 py-0.5 rounded-full text-sm font-bold font-mono">
-                    {filteredAndSortedMakeNow.length}
+                <h2 className="text-2xl font-serif font-bold text-white">
+                    {searchQuery ? "Search Results" : "Ready to Mix"}
+                </h2>
+                <div className={`px-3 py-0.5 rounded-full text-sm font-bold font-mono border ${searchQuery ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-lime-500/10 border-lime-500/20 text-lime-400'}`}>
+                    {displayedDrinks.length}
                 </div>
             </div>
 
@@ -158,7 +172,7 @@ export function ResultsPanel({
             <div className="relative w-full sm:w-64">
                 <input 
                     type="text" 
-                    placeholder="Search cocktails..." 
+                    placeholder="Search all recipes..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-lime-500/50 transition-all"
@@ -189,27 +203,36 @@ export function ResultsPanel({
         )}
 
         {/* Empty State */}
-        {filteredAndSortedMakeNow.length === 0 && (
+        {displayedDrinks.length === 0 && (
           <div className="flex flex-col items-center justify-center p-12 border border-dashed border-slate-800 rounded-2xl bg-slate-900/30 text-center">
             <div className="text-5xl mb-4 opacity-80">🍸</div>
             <h3 className="text-slate-200 font-semibold mb-2 text-lg">
-                {makeNow.length === 0 ? "Your bar is looking a bit dry" : "No matches found"}
+                {searchQuery ? "No matches found" : "Your bar is looking a bit dry"}
             </h3>
             <p className="text-slate-500 text-sm max-w-sm leading-relaxed mx-auto">
-                {makeNow.length === 0 
-                    ? "Add ingredients from the panel on the left to discover what you can make." 
-                    : "Try adjusting your search or filters to see more results."}
+                {searchQuery 
+                    ? "Try adjusting your search terms or clearing the category filters." 
+                    : "Add ingredients from the panel on the left to discover what you can make."}
             </p>
           </div>
         )}
 
         {/* Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredAndSortedMakeNow.map(({cocktail}) => (
+          {displayedDrinks.map(({ cocktail, missingRequiredIngredientIds }) => {
+            // Check if we are missing items
+            const missingCount = missingRequiredIngredientIds.length;
+            const isReady = missingCount === 0;
+
+            return (
             <div
               key={cocktail.id}
               onClick={() => openRecipe(cocktail)}
-              className="cursor-pointer group relative flex flex-col overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 hover:border-lime-500/40 hover:shadow-xl hover:shadow-lime-900/10 transition-all duration-300"
+              className={`cursor-pointer group relative flex flex-col overflow-hidden rounded-2xl border transition-all duration-300 ${
+                  isReady 
+                  ? "bg-slate-900 border-slate-800 hover:border-lime-500/40 hover:shadow-xl hover:shadow-lime-900/10" 
+                  : "bg-slate-900/40 border-slate-800/60 opacity-80 hover:opacity-100 hover:border-slate-700"
+              }`}
             >
               <div className="relative h-56 w-full overflow-hidden bg-slate-800">
                 {cocktail.image_url ? (
@@ -217,7 +240,7 @@ export function ResultsPanel({
                   <img
                     src={cocktail.image_url}
                     alt=""
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                    className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 ${isReady ? 'opacity-90 group-hover:opacity-100' : 'opacity-60 grayscale-[0.5]'}`}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80" />
                   </>
@@ -225,12 +248,22 @@ export function ResultsPanel({
                     <div className="h-full w-full flex items-center justify-center text-slate-700 text-4xl">🥃</div>
                 )}
                 
-                {/* FAVORITE LABEL */}
-                {cocktail.is_popular && (
-                    <div className="absolute top-3 left-3 bg-amber-500 text-slate-950 text-[10px] font-bold px-2 py-1 rounded shadow-lg backdrop-blur-sm flex items-center gap-1 z-20 tracking-wider">
-                        ★ FAVORITE
-                    </div>
-                )}
+                {/* STATUS BADGES */}
+                <div className="absolute top-3 left-3 flex flex-col gap-1 z-20 items-start">
+                    {/* 1. Missing Ingredients Badge (Priority) */}
+                    {!isReady && (
+                        <div className="bg-red-500/90 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg backdrop-blur-sm flex items-center gap-1">
+                            MISSING {missingCount}
+                        </div>
+                    )}
+                    
+                    {/* 2. Favorite Badge */}
+                    {cocktail.is_popular && (
+                        <div className="bg-amber-500 text-slate-950 text-[10px] font-bold px-2 py-1 rounded shadow-lg backdrop-blur-sm flex items-center gap-1 tracking-wider">
+                            ★ FAVORITE
+                        </div>
+                    )}
+                </div>
 
                 <button
                     onClick={(e) => {
@@ -244,12 +277,12 @@ export function ResultsPanel({
               </div>
               
               <div className="p-5 flex-1 flex flex-col relative z-10 -mt-16">
-                <div className="bg-slate-950/80 backdrop-blur-md rounded-xl p-4 border border-white/10 shadow-lg flex-1 flex flex-col">
+                <div className={`backdrop-blur-md rounded-xl p-4 border border-white/10 shadow-lg flex-1 flex flex-col ${isReady ? 'bg-slate-950/80' : 'bg-slate-950/60'}`}>
                     <div className="mb-2">
                         <p className="text-[10px] text-lime-400 font-bold tracking-widest uppercase mb-1">
                             {cocktail.category}
                         </p>
-                        <h3 className="font-serif font-bold text-xl text-slate-100 leading-tight">
+                        <h3 className={`font-serif font-bold text-xl leading-tight ${isReady ? 'text-slate-100' : 'text-slate-300'}`}>
                             {cocktail.name}
                         </h3>
                     </div>
@@ -259,12 +292,12 @@ export function ResultsPanel({
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
-      {/* 2. SMART ADDITIONS */}
-      {unlockPotential.length > 0 && (
+      {/* 2. SMART ADDITIONS (Hidden when searching to reduce noise) */}
+      {!searchQuery && unlockPotential.length > 0 && (
       <div className="border-t border-slate-800/50 pt-10">
         <div className="flex items-center gap-3 mb-6">
             <h2 className="text-2xl font-serif font-bold text-white">Smart Additions</h2>
@@ -283,7 +316,7 @@ export function ResultsPanel({
                              <span className="text-[9px] font-bold text-slate-500 uppercase mt-0.5">Drinks</span>
                         </div>
                         
-                        {/* NAME & CATEGORY */}
+                        {/* NAME (Sans Serif) & CATEGORY (Below) */}
                         <div className="flex flex-col min-w-0 pt-1">
                             <h4 className="font-bold text-slate-100 text-lg leading-tight break-words">
                                 {item.name}
