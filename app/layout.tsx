@@ -2,6 +2,13 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { SupabaseProvider } from './providers';
 import { HeaderAuth } from '@/components/HeaderAuth';
+import { Inter, Playfair_Display } from 'next/font/google';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const playfair = Playfair_Display({ 
+  subsets: ['latin'], 
+  variable: '--font-playfair' 
+});
 
 export const metadata: Metadata = {
   title: 'MixWise',
@@ -14,14 +21,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-slate-950 text-slate-50">
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+      <body className="bg-slate-950 text-slate-50 font-sans selection:bg-lime-500/30">
+        <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black -z-10" />
+        
         <SupabaseProvider initialSession={null}>
           <div className="min-h-screen flex flex-col">
-            <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-lime-400/80" />
-                <span className="font-semibold tracking-tight text-lg">MixWise</span>
+            <header className="border-b border-white/5 bg-slate-950/50 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-lime-400 to-emerald-600 shadow-lg shadow-lime-500/20" />
+                <span className="font-serif font-bold tracking-tight text-2xl bg-clip-text text-transparent bg-gradient-to-r from-slate-100 to-slate-400">
+                  MixWise
+                </span>
               </div>
               <HeaderAuth />
             </header>
