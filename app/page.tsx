@@ -41,6 +41,7 @@ export default function HomePage() {
           category: d.category,
           image_url: d.image_url,
           glass: d.glass,
+          is_popular: d.is_popular, // Added this field
           ingredients: d.cocktail_ingredients.map((ci: any) => ({
             id: ci.ingredient.id,
             name: ci.ingredient.name,
@@ -59,7 +60,6 @@ export default function HomePage() {
     async function loadLocal() {
       const { ingredientIds } = await loadInventory(supabase);
       setInventoryIds(ingredientIds);
-      // Future: Load favorites from local storage too
     }
     loadLocal();
   }, []);
@@ -83,7 +83,6 @@ export default function HomePage() {
       } else {
           setFavoriteIds(prev => [...prev, id]);
       }
-      // TODO: Save favorites to local storage
   };
 
   if (dataLoading)
